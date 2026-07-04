@@ -2,7 +2,7 @@
 name = "time-travel-db-rs"
 version = "0.1.0"
 edition = "2024"
-description = "An append-only, time-travelling key-value store: state folded from an event log, with cheap historical snapshots."
+description = "An append-only, time-travelling key-value store: an event log in SQLite, with cheap historical snapshots."
 authors = ["Aditya Kamath <aditya.kamath.270@gmail.com>"]
 license = "MIT"
 readme = "README.md"
@@ -10,8 +10,6 @@ keywords = ["database", "time-travel", "event-sourcing", "key-value", "append-on
 categories = ["database-implementations", "data-structures"]
 
 [dependencies]
-imbl = "7.0.0"
-jiff = { version = "0.2.28", features = ["serde"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+jiff = "0.2.28"
+rusqlite = { version = "0.40.1", features = ["bundled"] }
 thiserror = "2.0.18"
