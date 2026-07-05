@@ -3,11 +3,27 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use time_travel_db_rs::{
-    Assertion, Change, Db, Error, Snapshot, Timestamp, Value, connect, diff, in_memory, inspect,
+    Assertion, Change, Db, DiffEntry, Entry, Error, Snapshot, Timestamp, Value, connect, diff,
+    in_memory, inspect,
 };
 
 fn ts(s: &str) -> Timestamp {
     s.parse().unwrap()
+}
+
+fn entry(key: &str, value: impl Into<Value>) -> Entry {
+    Entry {
+        key: key.into(),
+        value: value.into(),
+    }
+}
+
+fn delta(key: &str, before: Option<Value>, after: Option<Value>) -> DiffEntry {
+    DiffEntry {
+        key: key.into(),
+        before,
+        after,
+    }
 }
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -120,10 +136,8 @@ fn scheduled_changes_wait_for_their_valid_time() {
         now.valid_unbounded().get("price").unwrap(),
         Some(Value::Int(4))
     );
-    assert_eq!(
-        now.entries().unwrap(),
-        vec![("price".into(), Value::Int(3))]
-    );
+    assert_eq!(now.valid_unbounded().valid(), None);
+    assert_eq!(now.entries().unwrap(), vec![entry("price", 3)]);
 }
 
 #[test]
@@ -138,7 +152,9 @@ fn known_at_walks_the_log_by_wall_clock() {
     let stamp = |seq| db.event(seq).unwrap().ts;
     let before = stamp(0) - Duration::from_secs(1);
     assert_eq!(db.known_at(before).unwrap().get("x").unwrap(), None);
+    assert_eq!(db.known_at(before).unwrap().seq(), None);
     assert!(db.known_at(before).unwrap().entries().unwrap().is_empty());
+    assert_eq!(db.known_at(stamp(1)).unwrap().seq(), Some(1));
     let get = |t| db.known_at(t).unwrap().get("x").unwrap();
     assert_eq!(get(stamp(0)), Some(Value::Int(1)));
     assert_eq!(
@@ -157,11 +173,11 @@ fn entries_lists_the_state_at_a_coordinate() {
 
     assert_eq!(
         db.latest().unwrap().entries().unwrap(),
-        vec![("a".into(), Value::Int(1)), ("c".into(), Value::Int(3))]
+        vec![entry("a", 1), entry("c", 3)]
     );
     assert_eq!(
         db.at(0).unwrap().entries().unwrap(),
-        vec![("a".into(), Value::Int(1)), ("b".into(), Value::Int(2))]
+        vec![entry("a", 1), entry("b", 2)]
     );
 }
 
@@ -185,9 +201,9 @@ fn diff_spans_both_axes() {
     assert_eq!(
         changed,
         vec![
-            ("add".into(), None, Some(Value::Int(4))),
-            ("change".into(), Some(Value::Int(2)), Some(Value::Int(20))),
-            ("drop".into(), Some(Value::Int(3)), None),
+            delta("add", None, Some(Value::Int(4))),
+            delta("change", Some(Value::Int(2)), Some(Value::Int(20))),
+            delta("drop", Some(Value::Int(3)), None),
         ]
     );
 
@@ -202,7 +218,7 @@ fn diff_spans_both_axes() {
     let now = db.latest().unwrap();
     assert_eq!(
         diff(&now.valid_at(jan), &now.valid_at(jun)).unwrap(),
-        vec![("x".into(), Some(Value::Int(1)), Some(Value::Int(2)))]
+        vec![delta("x", Some(Value::Int(1)), Some(Value::Int(2)))]
     );
 }
 
@@ -255,6 +271,36 @@ fn when_bisects_the_log() {
         db.when(|s| seen(s.valid_unbounded())).unwrap(),
         Some(0)
     );
+}
+
+#[test]
+fn blame_names_the_assertion_in_force() {
+    let mut db = in_memory().unwrap();
+    let jan = ts("2020-01-01T00:00:00Z");
+    let mar = ts("2020-03-01T00:00:00Z");
+    db.batch().set_from("x", "a", jan).commit().unwrap();
+    db.batch().set_from("x", "c", mar).commit().unwrap();
+    db.batch().delete("x").commit().unwrap();
+
+    let now = db.latest().unwrap();
+    assert_eq!(
+        now.valid_at(ts("2020-02-01T00:00:00Z")).blame("x").unwrap(),
+        Some(Assertion {
+            seq: 0,
+            valid: jan,
+            value: Some(Value::Str("a".into())),
+            ts: db.event(0).unwrap().ts,
+        })
+    );
+    let apr = now.valid_at(ts("2020-04-01T00:00:00Z"));
+    assert_eq!(apr.blame("x").unwrap().unwrap().seq, 1);
+
+    // absent now, and blame names the deleting event
+    assert_eq!(now.get("x").unwrap(), None);
+    let gone = now.blame("x").unwrap().unwrap();
+    assert_eq!((gone.seq, gone.value), (2, None));
+
+    assert_eq!(now.blame("y").unwrap(), None);
 }
 
 #[test]

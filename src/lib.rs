@@ -8,7 +8,7 @@ use thiserror::Error;
 
 pub use jiff::Timestamp;
 
-pub type Seq = usize;
+pub type Seq = i64;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -51,7 +51,7 @@ impl From<&str> for Value {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("no event at seq {seq}: the log holds {len}")]
-    OutOfRange { seq: Seq, len: usize },
+    OutOfRange { seq: Seq, len: Seq },
     #[error("a batch must contain at least one change")]
     Empty,
     #[error("unreadable row in the log")]
@@ -146,6 +146,34 @@ pub struct Assertion {
     pub ts: Timestamp,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Entry {
+    pub key: String,
+    pub value: Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiffEntry {
+    pub key: String,
+    pub before: Option<Value>,
+    pub after: Option<Value>,
+}
+
+type AssertionRow = (i64, i64, Option<i64>, Sql, i64);
+
+fn assertion_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<AssertionRow> {
+    Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+}
+
+fn decode_assertion((seq, valid, kind, value, ts): AssertionRow) -> Result<Assertion, Error> {
+    Ok(Assertion {
+        seq,
+        valid: from_micros(valid)?,
+        value: decode(kind, value)?,
+        ts: from_micros(ts)?,
+    })
+}
+
 pub struct Db<M: DbMode> {
     conn: Connection,
     _mode: PhantomData<M>,
@@ -157,13 +185,12 @@ impl<M: DbMode> Db<M> {
         Ok(Db { conn, _mode: PhantomData })
     }
 
-    pub fn len(&self) -> Result<usize, Error> {
-        let len: i64 =
-            self.conn
-                .query_row("SELECT coalesce(max(seq) + 1, 0) FROM events", [], |row| {
-                    row.get(0)
-                })?;
-        Ok(len as usize)
+    pub fn len(&self) -> Result<Seq, Error> {
+        Ok(self
+            .conn
+            .query_row("SELECT coalesce(max(seq) + 1, 0) FROM events", [], |row| {
+                row.get(0)
+            })?)
     }
 
     pub fn is_empty(&self) -> Result<bool, Error> {
@@ -173,11 +200,9 @@ impl<M: DbMode> Db<M> {
     fn event_ts(&self, seq: Seq) -> Result<i64, Error> {
         let ts: Option<i64> = self
             .conn
-            .query_row(
-                "SELECT ts FROM events WHERE seq = ?1",
-                [seq as i64],
-                |row| row.get(0),
-            )
+            .query_row("SELECT ts FROM events WHERE seq = ?1", [seq], |row| {
+                row.get(0)
+            })
             .optional()?;
         match ts {
             Some(ts) => Ok(ts),
@@ -197,7 +222,7 @@ impl<M: DbMode> Db<M> {
     }
 
     pub fn known_at(&self, t: Timestamp) -> Result<Snapshot<'_>, Error> {
-        let seq: Option<i64> = self
+        let seq: Option<Seq> = self
             .conn
             .query_row(
                 "SELECT seq FROM events WHERE ts <= ?1
@@ -208,7 +233,7 @@ impl<M: DbMode> Db<M> {
             .optional()?;
         Ok(Snapshot {
             conn: &self.conn,
-            applied: seq.map_or(0, |seq| seq as usize + 1),
+            applied: seq.map_or(0, |seq| seq + 1),
             valid: t.as_microsecond(),
         })
     }
@@ -227,7 +252,7 @@ impl<M: DbMode> Db<M> {
             "SELECT key, valid, kind, value FROM changes
              WHERE seq = ?1 ORDER BY key, valid",
         )?;
-        let rows = stmt.query_map([seq as i64], |row| {
+        let rows = stmt.query_map([seq], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, i64>(1)?,
@@ -254,25 +279,8 @@ impl<M: DbMode> Db<M> {
              FROM changes c JOIN events e ON e.seq = c.seq
              WHERE c.key = ?1 ORDER BY c.seq, c.valid",
         )?;
-        let rows = stmt.query_map([key], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, Option<i64>>(2)?,
-                row.get::<_, Sql>(3)?,
-                row.get::<_, i64>(4)?,
-            ))
-        })?;
-        rows.map(|row| {
-            let (seq, valid, kind, value, ts) = row?;
-            Ok(Assertion {
-                seq: seq as Seq,
-                valid: from_micros(valid)?,
-                value: decode(kind, value)?,
-                ts: from_micros(ts)?,
-            })
-        })
-        .collect()
+        let rows = stmt.query_map([key], assertion_row)?;
+        rows.map(|row| decode_assertion(row?)).collect()
     }
 
     /// the first event after which `pred` holds, by bisection
@@ -327,7 +335,7 @@ impl<M: Writable> Db<M> {
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let ts = Timestamp::now().as_microsecond();
-        let seq: i64 = tx.query_row(
+        let seq: Seq = tx.query_row(
             "INSERT INTO events (seq, ts)
              SELECT coalesce(max(seq) + 1, 0), ?1 FROM events
              RETURNING seq",
@@ -349,7 +357,7 @@ impl<M: Writable> Db<M> {
             }
         }
         tx.commit()?;
-        Ok(seq as Seq)
+        Ok(seq)
     }
 }
 
@@ -394,11 +402,22 @@ impl<M: Writable> Batch<'_, M> {
 #[derive(Clone, Copy)]
 pub struct Snapshot<'db> {
     conn: &'db Connection,
-    applied: usize,
+    applied: Seq,
     valid: i64,
 }
 
 impl Snapshot<'_> {
+    /// the coordinate on the transaction axis: the last applied event,
+    /// `None` before any
+    pub fn seq(&self) -> Option<Seq> {
+        (self.applied > 0).then(|| self.applied - 1)
+    }
+
+    /// the coordinate on the valid axis, `None` when unbounded
+    pub fn valid(&self) -> Option<Timestamp> {
+        Timestamp::from_microsecond(self.valid).ok()
+    }
+
     pub fn valid_at(self, v: Timestamp) -> Self {
         Snapshot {
             valid: v.as_microsecond(),
@@ -420,11 +439,29 @@ impl Snapshot<'_> {
                 "SELECT kind, value FROM changes
                  WHERE key = ?1 AND valid <= ?2 AND seq < ?3
                  ORDER BY valid DESC, seq DESC LIMIT 1",
-                (key, self.valid, self.applied as i64),
+                (key, self.valid, self.applied),
                 |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, Sql>(1)?)),
             )
             .optional()?;
         row.map_or(Ok(None), |(kind, value)| decode(kind, value))
+    }
+
+    /// the assertion `get` reads at this coordinate; `None` when the key
+    /// has never been asserted here, an assertion with `value: None` when
+    /// the key is absent because that event deleted it
+    pub fn blame(&self, key: &str) -> Result<Option<Assertion>, Error> {
+        let row = self
+            .conn
+            .query_row(
+                "SELECT c.seq, c.valid, c.kind, c.value, e.ts
+                 FROM changes c JOIN events e ON e.seq = c.seq
+                 WHERE c.key = ?1 AND c.valid <= ?2 AND c.seq < ?3
+                 ORDER BY c.valid DESC, c.seq DESC LIMIT 1",
+                (key, self.valid, self.applied),
+                assertion_row,
+            )
+            .optional()?;
+        row.map(decode_assertion).transpose()
     }
 
     /// the distinct valid times at which this knowledge state changes:
@@ -435,11 +472,11 @@ impl Snapshot<'_> {
         let mut stmt = self.conn.prepare(
             "SELECT DISTINCT valid FROM changes WHERE seq < ?1 ORDER BY valid",
         )?;
-        let rows = stmt.query_map([self.applied as i64], |row| row.get::<_, i64>(0))?;
+        let rows = stmt.query_map([self.applied], |row| row.get::<_, i64>(0))?;
         rows.map(|row| from_micros(row?)).collect()
     }
 
-    pub fn entries(&self) -> Result<Vec<(String, Value)>, Error> {
+    pub fn entries(&self) -> Result<Vec<Entry>, Error> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT c.key, c.kind, c.value
              FROM keys k
@@ -448,7 +485,7 @@ impl Snapshot<'_> {
              ORDER BY c.key",
             winner("?1", "?2")
         ))?;
-        let rows = stmt.query_map((self.valid, self.applied as i64), |row| {
+        let rows = stmt.query_map((self.valid, self.applied), |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, i64>(1)?,
@@ -457,13 +494,14 @@ impl Snapshot<'_> {
         })?;
         rows.map(|row| {
             let (key, kind, value) = row?;
-            Ok((key, decode_value(kind, value)?))
+            Ok(Entry {
+                key,
+                value: decode_value(kind, value)?,
+            })
         })
         .collect()
     }
 }
-
-pub type DiffEntry = (String, Option<Value>, Option<Value>);
 
 pub fn diff(a: &Snapshot<'_>, b: &Snapshot<'_>) -> Result<Vec<DiffEntry>, Error> {
     let mut stmt = a.conn.prepare(&format!(
@@ -476,21 +514,22 @@ pub fn diff(a: &Snapshot<'_>, b: &Snapshot<'_>) -> Result<Vec<DiffEntry>, Error>
         winner("?1", "?2"),
         winner("?3", "?4")
     ))?;
-    let rows = stmt.query_map(
-        (a.valid, a.applied as i64, b.valid, b.applied as i64),
-        |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, Option<i64>>(1)?,
-                row.get::<_, Sql>(2)?,
-                row.get::<_, Option<i64>>(3)?,
-                row.get::<_, Sql>(4)?,
-            ))
-        },
-    )?;
+    let rows = stmt.query_map((a.valid, a.applied, b.valid, b.applied), |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, Option<i64>>(1)?,
+            row.get::<_, Sql>(2)?,
+            row.get::<_, Option<i64>>(3)?,
+            row.get::<_, Sql>(4)?,
+        ))
+    })?;
     rows.map(|row| {
         let (key, ka, va, kb, vb) = row?;
-        Ok((key, decode(ka, va)?, decode(kb, vb)?))
+        Ok(DiffEntry {
+            key,
+            before: decode(ka, va)?,
+            after: decode(kb, vb)?,
+        })
     })
     .collect()
 }

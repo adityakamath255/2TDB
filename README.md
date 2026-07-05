@@ -45,7 +45,7 @@ So `db.latest().valid_at(last_year)` is what we now believe was true last year, 
 
 The value at a coordinate is the assertion with the lexicographically greatest `(valid, seq)` among those visible there: one indexed lookup, nothing replayed. A consequence worth internalizing: corrections splice into the timeline rather than overriding everything after them. If the record says `a` since January and `b` since June, a later correction "actually `c` since March" changes March through May and leaves June onward with `b`, because at any valid time the latest valid-from at or before it wins. Re-asserting the same key at the same valid time supersedes that point outright.
 
-Scheduled changes fall out of the same rule: an assertion with a future valid time is invisible to `latest()` until the clock reaches it. `diff(a, b)` reports the keys that differ between any two coordinates, which covers both "what changed in the world" and "what did we learn" depending on which axis the coordinates vary along. `history(key)` lists every assertion ever made about a key; `event(seq)` shows one event as committed. `changepoints()` enumerates the valid axis of a snapshot: the distinct valid times at which its knowledge changes, so between two adjacent ones every read answers identically. It describes the knowledge state, not the view position, so scheduled changes are included.
+Scheduled changes fall out of the same rule: an assertion with a future valid time is invisible to `latest()` until the clock reaches it. `diff(a, b)` reports the keys that differ between any two coordinates, which covers both "what changed in the world" and "what did we learn" depending on which axis the coordinates vary along. `history(key)` lists every assertion ever made about a key; `event(seq)` shows one event as committed. `blame(key)` on a snapshot names the winning assertion itself — value, valid time, event, commit time — git blame for one key at one coordinate. Blaming an absent key answers "which event deleted it", distinct from "never asserted" (`None`). `changepoints()` enumerates the valid axis of a snapshot: the distinct valid times at which its knowledge changes, so between two adjacent ones every read answers identically. It describes the knowledge state, not the view position, so scheduled changes are included.
 
 `when(pred)` bisects the log for the first event after which a predicate on the state holds: log2(n) probes instead of a replay, under the git-bisect contract that the predicate flips once from false to true. Each probe sees `at(seq)`, valid time tracking the event; pinning it inside the predicate asks instead when a fixed moment was first believed to satisfy it:
 
@@ -112,6 +112,15 @@ WHERE c.seq < :T
   AND NOT EXISTS (SELECT 1 FROM changes k
                    WHERE k.key = c.key AND k.valid = c.valid
                      AND k.seq > c.seq AND k.seq < :T);
+```
+
+Blame for one key at any coordinate (T as above, V in epoch microseconds):
+
+```sql
+SELECT c.seq, c.valid, c.kind, c.value, e.ts
+FROM changes c JOIN events e ON e.seq = c.seq
+WHERE c.key = :key AND c.valid <= :V AND c.seq < :T
+ORDER BY c.valid DESC, c.seq DESC LIMIT 1;
 ```
 
 A full bitemporal decomposition also exists: every assertion's region of authority in the (transaction, valid) plane, as half-open rectangles, derived entirely from the log. `tx` bounds are in applied-event units, NULL bounds are open ends. It is deliberately not installed as a view: enumerating it costs quadratic time on keys with long plain-append histories, which measurement showed makes it wrong as a default read path. For offline analysis on modest data:

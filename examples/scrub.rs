@@ -10,7 +10,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Row, Table, TableState};
 use ratatui::{DefaultTerminal, Frame};
 
-use time_travel_db_rs::{Db, Error, ReadOnly, Snapshot, Timestamp, Value, diff, inspect};
+use time_travel_db_rs::{Db, Error, ReadOnly, Seq, Snapshot, Timestamp, Value, diff, inspect};
 
 const FOOTER: &str = " tx: h/l ±1 · H/L ±10 · g/G first/latest · :event-or-date jump · n/N selected key's events
  valid: [/] changepoint hop · @date pin · v follow events · u unbounded
@@ -20,20 +20,8 @@ const PROMPT_HELP: &str = " enter apply · esc cancel";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = env::args().nth(1).ok_or("usage: scrub <database>")?;
     let db = inspect(path)?;
-    let len = db.len()?;
-    let mut app = App {
-        cursor: (len > 0).then(|| Cursor {
-            len,
-            seq: len - 1,
-            valid: ValidMode::Track,
-        }),
-        db,
-        anchor: None,
-        selected: None,
-        history: None,
-        prompt: None,
-        filter: None,
-    };
+    let screen = Screen::open(&db)?;
+    let mut app = App { db, screen };
     let mut terminal = ratatui::init();
     let outcome = run(&mut terminal, &mut app);
     ratatui::restore();
@@ -49,19 +37,19 @@ enum ValidMode {
 
 #[derive(Clone, Copy, PartialEq)]
 struct Cursor {
-    len: usize,
-    seq: usize,
+    len: Seq,
+    seq: Seq,
     valid: ValidMode,
 }
 
 impl Cursor {
-    fn step(self, delta: isize) -> Self {
-        self.jump(self.seq.saturating_add_signed(delta))
+    fn step(self, delta: Seq) -> Self {
+        self.jump(self.seq.saturating_add(delta))
     }
 
-    fn jump(self, seq: usize) -> Self {
+    fn jump(self, seq: Seq) -> Self {
         Cursor {
-            seq: seq.min(self.len - 1),
+            seq: seq.clamp(0, self.len - 1),
             ..self
         }
     }
@@ -71,10 +59,6 @@ impl Cursor {
     }
 }
 
-/// A pinned comparison point: which snapshot to diff against, and whether
-/// the state table should be narrowed to just the rows that differ from it.
-/// `diff_only` only ever exists alongside an `at`, so there's no way to end
-/// up with a dangling diff-only mode once the anchor is cleared.
 #[derive(Clone, Copy, PartialEq)]
 struct Anchor {
     at: Cursor,
@@ -93,14 +77,52 @@ struct Prompt {
     buffer: String,
 }
 
+enum Command {
+    Jump(Seq),
+    JumpTo(Timestamp),
+    Pin(Timestamp),
+    Filter(Option<String>),
+}
+
 struct App {
     db: Db<ReadOnly>,
-    cursor: Option<Cursor>,
+    screen: Screen,
+}
+
+enum Screen {
+    Empty,
+    Loaded(Loaded),
+}
+
+struct Loaded {
+    cursor: Cursor,
     anchor: Option<Anchor>,
     selected: Option<String>,
     history: Option<String>,
     prompt: Option<Prompt>,
     filter: Option<String>,
+}
+
+impl Screen {
+    fn open(db: &Db<ReadOnly>) -> Result<Self, Error> {
+        let len = db.len()?;
+        Ok(if len == 0 {
+            Screen::Empty
+        } else {
+            Screen::Loaded(Loaded {
+                cursor: Cursor {
+                    len,
+                    seq: len - 1,
+                    valid: ValidMode::Track,
+                },
+                anchor: None,
+                selected: None,
+                history: None,
+                prompt: None,
+                filter: None,
+            })
+        })
+    }
 }
 
 fn snapshot<'db>(db: &'db Db<ReadOnly>, cursor: Cursor) -> Result<Snapshot<'db>, Error> {
@@ -114,164 +136,217 @@ fn snapshot<'db>(db: &'db Db<ReadOnly>, cursor: Cursor) -> Result<Snapshot<'db>,
 
 fn run(terminal: &mut DefaultTerminal, app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     loop {
-        let view = build(app)?;
+        let view = build(&app.db, &app.screen)?;
         terminal.draw(|frame| draw(frame, &view))?;
-        if let Event::Key(key) = event::read()? {
-            if key.kind != KeyEventKind::Press {
-                continue;
-            }
-            if app.prompt.is_some() {
-                prompt_key(app, key.code)?;
-                continue;
-            }
-            match key.code {
+        let Event::Key(key) = event::read()? else {
+            continue;
+        };
+        if key.kind != KeyEventKind::Press {
+            continue;
+        }
+        match &mut app.screen {
+            Screen::Empty => match key.code {
                 KeyCode::Char('q') => return Ok(()),
-                KeyCode::Char('h') | KeyCode::Left => step(app, -1),
-                KeyCode::Char('l') | KeyCode::Right => step(app, 1),
-                KeyCode::Char('H') => step(app, -10),
-                KeyCode::Char('L') => step(app, 10),
-                KeyCode::Char('g') => app.cursor = app.cursor.map(|c| c.jump(0)),
-                KeyCode::Char('G') => refresh(app)?,
-                KeyCode::Char(':') => open_prompt(app, PromptKind::Tx, String::new()),
-                KeyCode::Char('@') => open_prompt(app, PromptKind::Valid, String::new()),
-                KeyCode::Char('/') => {
-                    let initial = app.filter.clone().unwrap_or_default();
-                    open_prompt(app, PromptKind::Filter, initial);
-                }
-                KeyCode::Char('d') => {
-                    if let Some(anchor) = &mut app.anchor {
-                        anchor.diff_only = !anchor.diff_only;
-                    }
-                }
-                KeyCode::Char('n') => step_key_event(app, 1)?,
-                KeyCode::Char('N') => step_key_event(app, -1)?,
-                KeyCode::Char('[') => step_valid(app, -1)?,
-                KeyCode::Char(']') => step_valid(app, 1)?,
-                KeyCode::Char('v') => set_valid(app, ValidMode::Track),
-                KeyCode::Char('u') => {
-                    let mode = match app.cursor.map(|c| c.valid) {
-                        Some(ValidMode::Unbounded) => ValidMode::Track,
-                        _ => ValidMode::Unbounded,
-                    };
-                    set_valid(app, mode);
-                }
-                KeyCode::Char('m') => {
-                    if let Some(c) = app.cursor {
-                        app.anchor = if app.anchor.map(|a| a.at) == Some(c) {
-                            None
-                        } else {
-                            Some(Anchor {
-                                at: c,
-                                diff_only: false,
-                            })
-                        };
-                    }
-                }
-                KeyCode::Char('j') | KeyCode::Down => select(app, &view.rows, 1),
-                KeyCode::Char('k') | KeyCode::Up => select(app, &view.rows, -1),
-                KeyCode::Enter => app.history = app.selected.clone(),
-                KeyCode::Esc => {
-                    if app.history.is_some() {
-                        app.history = None;
-                    } else if app.filter.is_some() {
-                        app.filter = None;
-                    } else {
-                        app.anchor = None;
-                    }
-                }
+                KeyCode::Char('G') => app.screen = Screen::open(&app.db)?,
                 _ => {}
-            }
-        }
-    }
-}
-
-fn open_prompt(app: &mut App, kind: PromptKind, buffer: String) {
-    if app.cursor.is_some() {
-        app.prompt = Some(Prompt { kind, buffer });
-    }
-}
-
-fn step_key_event(app: &mut App, dir: isize) -> Result<(), Error> {
-    let (Some(cur), Some(key)) = (app.cursor, app.selected.as_deref()) else {
-        return Ok(());
-    };
-    let seqs: Vec<usize> = app
-        .db
-        .history(key)?
-        .iter()
-        .map(|a| a.seq)
-        .filter(|&s| s < cur.len)
-        .collect();
-    let target = if dir > 0 {
-        seqs.iter().find(|&&s| s > cur.seq)
-    } else {
-        seqs.iter().rev().find(|&&s| s < cur.seq)
-    };
-    if let Some(&s) = target {
-        app.cursor = app.cursor.map(|c| c.jump(s));
-    }
-    Ok(())
-}
-
-fn prompt_key(app: &mut App, code: KeyCode) -> Result<(), Error> {
-    let Some(mut prompt) = app.prompt.take() else {
-        return Ok(());
-    };
-    match code {
-        KeyCode::Esc => {}
-        KeyCode::Enter => {
-            if !apply_prompt(app, &prompt)? {
-                app.prompt = Some(prompt);
-            }
-        }
-        KeyCode::Backspace => {
-            prompt.buffer.pop();
-            app.prompt = Some(prompt);
-        }
-        KeyCode::Char(c) => {
-            prompt.buffer.push(c);
-            app.prompt = Some(prompt);
-        }
-        _ => app.prompt = Some(prompt),
-    }
-    Ok(())
-}
-
-fn apply_prompt(app: &mut App, prompt: &Prompt) -> Result<bool, Error> {
-    let Some(cur) = app.cursor else {
-        return Ok(true);
-    };
-    match prompt.kind {
-        PromptKind::Filter => {
-            let trimmed = prompt.buffer.trim();
-            app.filter = (!trimmed.is_empty()).then(|| trimmed.to_string());
-            Ok(true)
-        }
-        PromptKind::Tx => {
-            if let Ok(seq) = prompt.buffer.trim().parse::<usize>() {
-                app.cursor = app.cursor.map(|c| c.jump(seq));
-                return Ok(true);
-            }
-            if let Some(t) = parse_time(&prompt.buffer) {
-                if let Some(seq) = seq_known_at(&app.db, cur.len, t)? {
-                    app.cursor = app.cursor.map(|c| c.jump(seq));
+            },
+            Screen::Loaded(st) => {
+                if st.prompt.is_some() {
+                    st.prompt_key(&app.db, key.code)?;
+                } else if key.code == KeyCode::Char('q') {
+                    return Ok(());
+                } else {
+                    st.key(&app.db, key.code, &view.rows)?;
                 }
-                return Ok(true);
             }
-            Ok(false)
         }
-        PromptKind::Valid => match parse_time(&prompt.buffer) {
-            Some(t) => {
-                app.cursor = app.cursor.map(|c| c.with_valid(ValidMode::Pinned(t)));
-                Ok(true)
+    }
+}
+
+impl Loaded {
+    fn key(&mut self, db: &Db<ReadOnly>, code: KeyCode, rows: &[RowData]) -> Result<(), Error> {
+        match code {
+            KeyCode::Char('h') | KeyCode::Left => self.cursor = self.cursor.step(-1),
+            KeyCode::Char('l') | KeyCode::Right => self.cursor = self.cursor.step(1),
+            KeyCode::Char('H') => self.cursor = self.cursor.step(-10),
+            KeyCode::Char('L') => self.cursor = self.cursor.step(10),
+            KeyCode::Char('g') => self.cursor = self.cursor.jump(0),
+            KeyCode::Char('G') => {
+                let len = db.len()?;
+                if len > 0 {
+                    self.cursor = Cursor {
+                        len,
+                        seq: len - 1,
+                        ..self.cursor
+                    };
+                }
             }
-            None => Ok(false),
-        },
+            KeyCode::Char(':') => {
+                self.prompt = Some(Prompt {
+                    kind: PromptKind::Tx,
+                    buffer: String::new(),
+                })
+            }
+            KeyCode::Char('@') => {
+                self.prompt = Some(Prompt {
+                    kind: PromptKind::Valid,
+                    buffer: String::new(),
+                })
+            }
+            KeyCode::Char('/') => {
+                self.prompt = Some(Prompt {
+                    kind: PromptKind::Filter,
+                    buffer: self.filter.clone().unwrap_or_default(),
+                })
+            }
+            KeyCode::Char('d') => {
+                if let Some(anchor) = &mut self.anchor {
+                    anchor.diff_only = !anchor.diff_only;
+                }
+            }
+            KeyCode::Char('n') => self.step_key_event(db, 1)?,
+            KeyCode::Char('N') => self.step_key_event(db, -1)?,
+            KeyCode::Char('[') => self.step_valid(db, -1)?,
+            KeyCode::Char(']') => self.step_valid(db, 1)?,
+            KeyCode::Char('v') => self.cursor = self.cursor.with_valid(ValidMode::Track),
+            KeyCode::Char('u') => {
+                let mode = match self.cursor.valid {
+                    ValidMode::Unbounded => ValidMode::Track,
+                    _ => ValidMode::Unbounded,
+                };
+                self.cursor = self.cursor.with_valid(mode);
+            }
+            KeyCode::Char('m') => {
+                self.anchor = match self.anchor {
+                    Some(a) if a.at == self.cursor => None,
+                    _ => Some(Anchor {
+                        at: self.cursor,
+                        diff_only: false,
+                    }),
+                };
+            }
+            KeyCode::Char('j') | KeyCode::Down => self.select(rows, 1),
+            KeyCode::Char('k') | KeyCode::Up => self.select(rows, -1),
+            KeyCode::Enter => self.history = self.selected.clone(),
+            KeyCode::Esc => {
+                if self.history.is_some() {
+                    self.history = None;
+                } else if self.filter.is_some() {
+                    self.filter = None;
+                } else {
+                    self.anchor = None;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn prompt_key(&mut self, db: &Db<ReadOnly>, code: KeyCode) -> Result<(), Error> {
+        let Some(prompt) = &mut self.prompt else {
+            return Ok(());
+        };
+        match code {
+            KeyCode::Esc => self.prompt = None,
+            KeyCode::Enter => {
+                if let Some(cmd) = parse_command(prompt) {
+                    self.prompt = None;
+                    self.exec(db, cmd)?;
+                }
+            }
+            KeyCode::Backspace => {
+                prompt.buffer.pop();
+            }
+            KeyCode::Char(c) => prompt.buffer.push(c),
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn exec(&mut self, db: &Db<ReadOnly>, cmd: Command) -> Result<(), Error> {
+        match cmd {
+            Command::Jump(seq) => self.cursor = self.cursor.jump(seq),
+            Command::JumpTo(t) => {
+                if let Some(seq) = db.known_at(t)?.seq() {
+                    self.cursor = self.cursor.jump(seq);
+                }
+            }
+            Command::Pin(t) => self.cursor = self.cursor.with_valid(ValidMode::Pinned(t)),
+            Command::Filter(f) => self.filter = f,
+        }
+        Ok(())
+    }
+
+    fn step_key_event(&mut self, db: &Db<ReadOnly>, dir: Seq) -> Result<(), Error> {
+        let Some(key) = self.selected.as_deref() else {
+            return Ok(());
+        };
+        let cur = self.cursor;
+        let seqs: Vec<Seq> = db
+            .history(key)?
+            .iter()
+            .map(|a| a.seq)
+            .filter(|&s| s < cur.len)
+            .collect();
+        let target = if dir > 0 {
+            seqs.iter().find(|&&s| s > cur.seq)
+        } else {
+            seqs.iter().rev().find(|&&s| s < cur.seq)
+        };
+        if let Some(&s) = target {
+            self.cursor = cur.jump(s);
+        }
+        Ok(())
+    }
+
+    fn step_valid(&mut self, db: &Db<ReadOnly>, dir: Seq) -> Result<(), Error> {
+        let snap = snapshot(db, self.cursor)?;
+        let points = snap.changepoints()?;
+        let target = match (dir > 0, snap.valid()) {
+            (true, Some(t)) => points.iter().find(|&&p| p > t),
+            (true, None) => None,
+            (false, Some(t)) => points.iter().rev().find(|&&p| p < t),
+            (false, None) => points.last(),
+        };
+        if let Some(&t) = target {
+            self.cursor = self.cursor.with_valid(ValidMode::Pinned(t));
+        }
+        Ok(())
+    }
+
+    fn select(&mut self, rows: &[RowData], delta: isize) {
+        if rows.is_empty() {
+            self.selected = None;
+            return;
+        }
+        let at = self
+            .selected
+            .as_ref()
+            .and_then(|key| rows.iter().position(|r| &r.key == key));
+        let to = match at {
+            Some(i) => i.saturating_add_signed(delta).min(rows.len() - 1),
+            None => 0,
+        };
+        self.selected = Some(rows[to].key.clone());
+    }
+}
+
+fn parse_command(prompt: &Prompt) -> Option<Command> {
+    let input = prompt.buffer.trim();
+    match prompt.kind {
+        PromptKind::Filter => Some(Command::Filter(
+            (!input.is_empty()).then(|| input.to_string()),
+        )),
+        PromptKind::Tx => input
+            .parse()
+            .ok()
+            .map(Command::Jump)
+            .or_else(|| parse_time(input).map(Command::JumpTo)),
+        PromptKind::Valid => parse_time(input).map(Command::Pin),
     }
 }
 
 fn parse_time(input: &str) -> Option<Timestamp> {
-    let input = input.trim();
     if let Ok(t) = input.parse::<Timestamp>() {
         return Some(t);
     }
@@ -282,77 +357,6 @@ fn parse_time(input: &str) -> Option<Timestamp> {
         return d.to_zoned(TimeZone::UTC).ok().map(|z| z.timestamp());
     }
     None
-}
-
-/// last event whose ts is at or before t, assuming nondecreasing ts
-fn seq_known_at(db: &Db<ReadOnly>, len: usize, t: Timestamp) -> Result<Option<usize>, Error> {
-    let (mut lo, mut hi) = (0, len);
-    while lo < hi {
-        let mid = lo + (hi - lo) / 2;
-        if db.event(mid)?.ts <= t {
-            lo = mid + 1;
-        } else {
-            hi = mid;
-        }
-    }
-    Ok(lo.checked_sub(1))
-}
-
-fn step(app: &mut App, delta: isize) {
-    app.cursor = app.cursor.map(|c| c.step(delta));
-}
-
-fn set_valid(app: &mut App, valid: ValidMode) {
-    app.cursor = app.cursor.map(|c| c.with_valid(valid));
-}
-
-fn refresh(app: &mut App) -> Result<(), Error> {
-    let len = app.db.len()?;
-    let valid = app.cursor.map_or(ValidMode::Track, |c| c.valid);
-    app.cursor = (len > 0).then(|| Cursor {
-        len,
-        seq: len - 1,
-        valid,
-    });
-    Ok(())
-}
-
-fn step_valid(app: &mut App, dir: isize) -> Result<(), Error> {
-    let Some(cur) = app.cursor else {
-        return Ok(());
-    };
-    let points = snapshot(&app.db, cur)?.changepoints()?;
-    let at = match cur.valid {
-        ValidMode::Track => Some(app.db.event(cur.seq)?.ts),
-        ValidMode::Pinned(t) => Some(t),
-        ValidMode::Unbounded => None,
-    };
-    let target = match (dir > 0, at) {
-        (true, Some(t)) => points.iter().find(|&&p| p > t),
-        (true, None) => None,
-        (false, Some(t)) => points.iter().rev().find(|&&p| p < t),
-        (false, None) => points.last(),
-    };
-    if let Some(&t) = target {
-        app.cursor = app.cursor.map(|c| c.with_valid(ValidMode::Pinned(t)));
-    }
-    Ok(())
-}
-
-fn select(app: &mut App, rows: &[RowData], delta: isize) {
-    if rows.is_empty() {
-        app.selected = None;
-        return;
-    }
-    let at = app
-        .selected
-        .as_ref()
-        .and_then(|key| rows.iter().position(|r| &r.key == key));
-    let to = match at {
-        Some(i) => i.saturating_add_signed(delta).min(rows.len() - 1),
-        None => 0,
-    };
-    app.selected = Some(rows[to].key.clone());
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -375,11 +379,29 @@ struct ContextLine {
     pending: bool,
 }
 
-/// One piece of the status line: the text, and the color to render it in
-/// (`None` for the default/uncolored style). Building this list is the only
-/// place that decides what the status line contains — `draw` just renders it.
+struct StatusSpan {
+    text: String,
+    color: Option<Color>,
+}
+
+impl StatusSpan {
+    fn plain(text: impl Into<String>) -> Self {
+        StatusSpan {
+            text: text.into(),
+            color: None,
+        }
+    }
+
+    fn colored(text: impl Into<String>, color: Color) -> Self {
+        StatusSpan {
+            text: text.into(),
+            color: Some(color),
+        }
+    }
+}
+
 struct View {
-    status: Vec<(String, Option<Color>)>,
+    status: Vec<StatusSpan>,
     rows: Vec<RowData>,
     selected: Option<usize>,
     context_title: String,
@@ -395,8 +417,18 @@ fn fmt_valid(mode: ValidMode) -> String {
     }
 }
 
-fn build(app: &App) -> Result<View, Error> {
-    let prompt = app.prompt.as_ref().map(|p| {
+fn build(db: &Db<ReadOnly>, screen: &Screen) -> Result<View, Error> {
+    let Screen::Loaded(st) = screen else {
+        return Ok(View {
+            status: vec![StatusSpan::plain(" empty store · G to re-check")],
+            rows: vec![],
+            selected: None,
+            context_title: String::new(),
+            context: vec![],
+            prompt: None,
+        });
+    };
+    let prompt = st.prompt.as_ref().map(|p| {
         let prefix = match p.kind {
             PromptKind::Tx => ':',
             PromptKind::Valid => '@',
@@ -404,63 +436,51 @@ fn build(app: &App) -> Result<View, Error> {
         };
         format!(" {prefix}{}▏", p.buffer)
     });
-    let Some(cur) = app.cursor else {
-        return Ok(View {
-            status: vec![(" empty store · G to re-check".to_string(), None)],
-            rows: vec![],
-            selected: None,
-            context_title: String::new(),
-            context: vec![],
-            prompt,
-        });
-    };
-    let snap = snapshot(&app.db, cur)?;
-    let ev = app.db.event(cur.seq)?;
+    let snap = snapshot(db, st.cursor)?;
+    let ev = db.event(st.cursor.seq)?;
 
-    let mut status = vec![(
-        format!(
-            " event {}/{} · {} · valid: {}",
-            cur.seq,
-            cur.len - 1,
-            ev.ts,
-            fmt_valid(cur.valid)
-        ),
-        None,
-    )];
-    if let Some(anchor) = app.anchor {
-        status.push((
-            format!(" · vs event {} ({})", anchor.at.seq, fmt_valid(anchor.at.valid)),
-            None,
-        ));
+    let mut status = vec![StatusSpan::plain(format!(
+        " event {}/{} · {} · valid: {}",
+        st.cursor.seq,
+        st.cursor.len - 1,
+        ev.ts,
+        fmt_valid(st.cursor.valid)
+    ))];
+    if let Some(anchor) = st.anchor {
+        status.push(StatusSpan::plain(format!(
+            " · vs event {} ({})",
+            anchor.at.seq,
+            fmt_valid(anchor.at.valid)
+        )));
     }
-    if let Some(f) = &app.filter {
-        status.push((format!(" · /{f}"), None));
+    if let Some(f) = &st.filter {
+        status.push(StatusSpan::plain(format!(" · /{f}")));
     }
-    if let Some(anchor) = app.anchor {
+    if let Some(anchor) = st.anchor {
         if anchor.diff_only {
-            status.push((" · diff-only".to_string(), None));
+            status.push(StatusSpan::plain(" · diff-only"));
         }
-        status.push((" · changed".to_string(), Some(Color::Yellow)));
-        status.push((" +added".to_string(), Some(Color::Green)));
-        status.push((" -dropped".to_string(), Some(Color::Red)));
+        status.push(StatusSpan::colored(" · changed", Color::Yellow));
+        status.push(StatusSpan::colored(" +added", Color::Green));
+        status.push(StatusSpan::colored(" -dropped", Color::Red));
     }
 
     let mut marks: BTreeMap<String, Mark> = BTreeMap::new();
     let mut dropped: Vec<RowData> = vec![];
-    if let Some(anchor) = app.anchor {
-        for (key, old, new) in diff(&snapshot(&app.db, anchor.at)?, &snap)? {
-            match (old, new) {
+    if let Some(anchor) = st.anchor {
+        for entry in diff(&snapshot(db, anchor.at)?, &snap)? {
+            match (entry.before, entry.after) {
                 (None, Some(_)) => {
-                    marks.insert(key, Mark::Added);
+                    marks.insert(entry.key, Mark::Added);
                 }
                 (Some(old), None) => dropped.push(RowData {
                     kind: kind_name(&old),
                     value: fmt_value(&old),
-                    key,
+                    key: entry.key,
                     mark: Mark::Dropped,
                 }),
                 _ => {
-                    marks.insert(key, Mark::Changed);
+                    marks.insert(entry.key, Mark::Changed);
                 }
             }
         }
@@ -469,31 +489,30 @@ fn build(app: &App) -> Result<View, Error> {
     let mut rows: Vec<RowData> = snap
         .entries()?
         .into_iter()
-        .map(|(key, value)| RowData {
-            mark: marks.get(&key).copied().unwrap_or(Mark::Same),
-            kind: kind_name(&value),
-            value: fmt_value(&value),
-            key,
+        .map(|e| RowData {
+            mark: marks.get(&e.key).copied().unwrap_or(Mark::Same),
+            kind: kind_name(&e.value),
+            value: fmt_value(&e.value),
+            key: e.key,
         })
         .collect();
     rows.extend(dropped);
     rows.sort_by(|a, b| a.key.cmp(&b.key));
-    if let Some(f) = &app.filter {
+    if let Some(f) = &st.filter {
         rows.retain(|r| r.key.contains(f.as_str()));
     }
-    if app.anchor.is_some_and(|a| a.diff_only) {
+    if st.anchor.is_some_and(|a| a.diff_only) {
         rows.retain(|r| r.mark != Mark::Same);
     }
 
-    let selected = app
+    let selected = st
         .selected
         .as_ref()
         .and_then(|key| rows.iter().position(|r| &r.key == key));
 
-    let (context_title, context) = match &app.history {
+    let (context_title, context) = match &st.history {
         Some(key) => {
-            let lines = app
-                .db
+            let lines = db
                 .history(key)?
                 .into_iter()
                 .map(|a| {
@@ -503,7 +522,7 @@ fn build(app: &App) -> Result<View, Error> {
                     };
                     ContextLine {
                         text: format!("#{} {} · valid {} · at {}", a.seq, what, a.valid, a.ts),
-                        pending: a.seq > cur.seq,
+                        pending: a.seq > st.cursor.seq,
                     }
                 })
                 .collect();
@@ -524,7 +543,7 @@ fn build(app: &App) -> Result<View, Error> {
                     }
                 })
                 .collect();
-            (format!("event {}", cur.seq), lines)
+            (format!("event {}", st.cursor.seq), lines)
         }
     };
 
@@ -551,9 +570,9 @@ fn draw(frame: &mut Frame, view: &View) {
     let spans: Vec<Span> = view
         .status
         .iter()
-        .map(|(text, color)| match color {
-            Some(c) => Span::styled(text.as_str(), Style::default().fg(*c)),
-            None => Span::raw(text.as_str()),
+        .map(|s| match s.color {
+            Some(c) => Span::styled(s.text.as_str(), Style::default().fg(c)),
+            None => Span::raw(s.text.as_str()),
         })
         .collect();
     frame.render_widget(
