@@ -47,6 +47,15 @@ The value at a coordinate is the assertion with the lexicographically greatest `
 
 Scheduled changes fall out of the same rule: an assertion with a future valid time is invisible to `latest()` until the clock reaches it. `diff(a, b)` reports the keys that differ between any two coordinates, which covers both "what changed in the world" and "what did we learn" depending on which axis the coordinates vary along. `history(key)` lists every assertion ever made about a key; `event(seq)` shows one event as committed.
 
+`when(pred)` bisects the log for the first event after which a predicate on the state holds: log2(n) probes instead of a replay, under the git-bisect contract that the predicate flips once from false to true. Each probe sees `at(seq)`, valid time tracking the event; pinning it inside the predicate asks instead when a fixed moment was first believed to satisfy it:
+
+```rust
+// when did votes first reach 100?
+db.when(|s| Ok(matches!(s.get("votes")?, Some(Value::Int(n)) if n >= 100)))?;
+// when did we first believe anyone was employed in March?
+db.when(|s| Ok(s.valid_at(march).get("employer")?.is_some()))?;
+```
+
 ## Modes
 
 A store is opened in one of three modes, and the mode is part of its type, so the compiler enforces what each can do:

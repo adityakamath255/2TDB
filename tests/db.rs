@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use time_travel_db_rs::{
-    Assertion, Change, Error, Timestamp, Value, connect, diff, in_memory, inspect,
+    Assertion, Change, Db, Error, Snapshot, Timestamp, Value, connect, diff, in_memory, inspect,
 };
 
 fn ts(s: &str) -> Timestamp {
@@ -203,6 +203,33 @@ fn diff_spans_both_axes() {
     assert_eq!(
         diff(&now.valid_at(jan), &now.valid_at(jun)).unwrap(),
         vec![("x".into(), Some(Value::Int(1)), Some(Value::Int(2)))]
+    );
+}
+
+#[test]
+fn when_bisects_the_log() {
+    let mut db = in_memory().unwrap();
+    let above = |db: &Db<_>, thresh: i64| {
+        db.when(|s| Ok(matches!(s.get("n")?, Some(Value::Int(i)) if i >= thresh)))
+            .unwrap()
+    };
+    assert_eq!(above(&db, 0), None);
+    for i in 0..10 {
+        db.batch().set("n", i).commit().unwrap();
+    }
+    assert_eq!(above(&db, 0), Some(0));
+    assert_eq!(above(&db, 7), Some(7));
+    assert_eq!(above(&db, 10), None);
+
+    // pinning valid time inside the predicate
+    let mut db = in_memory().unwrap();
+    let future = Timestamp::now() + Duration::from_secs(3600);
+    db.batch().set_from("x", 1, future).commit().unwrap();
+    let seen = |s: Snapshot<'_>| Ok(s.get("x")?.is_some());
+    assert_eq!(db.when(seen).unwrap(), None);
+    assert_eq!(
+        db.when(|s| seen(s.valid_unbounded())).unwrap(),
+        Some(0)
     );
 }
 

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::marker::PhantomData;
 use std::path::Path;
 
 use rusqlite::types::Value as Sql;
@@ -87,10 +88,6 @@ fn decode(kind: Option<i64>, value: Sql) -> Result<Option<Value>, Error> {
     }
 }
 
-fn to_micros(ts: Timestamp) -> i64 {
-    ts.as_microsecond()
-}
-
 fn from_micros(micros: i64) -> Result<Timestamp, Error> {
     Timestamp::from_microsecond(micros).map_err(|_| Error::Corrupt)
 }
@@ -108,16 +105,24 @@ fn winner(valid: &str, applied: &str) -> String {
 
 const UNBOUNDED: i64 = i64::MAX;
 
-pub trait Writable {}
+mod sealed { pub trait Sealed {} }
+
+pub trait DbMode : sealed::Sealed {}
+pub trait Writable : DbMode {}
 
 pub struct ReadOnly;
-
 pub struct InMemory;
-
 pub struct Durable;
 
-impl Writable for InMemory {}
+impl sealed::Sealed for ReadOnly {}
+impl sealed::Sealed for InMemory {}
+impl sealed::Sealed for Durable {}
 
+impl DbMode for ReadOnly {}
+impl DbMode for InMemory {}
+impl DbMode for Durable {}
+
+impl Writable for InMemory {}
 impl Writable for Durable {}
 
 #[derive(Debug, Clone, PartialEq)]
@@ -141,15 +146,15 @@ pub struct Assertion {
     pub ts: Timestamp,
 }
 
-pub struct Db<M> {
+pub struct Db<M: DbMode> {
     conn: Connection,
-    _mode: M,
+    _mode: PhantomData<M>,
 }
 
-impl<M> Db<M> {
-    fn open(conn: Connection, mode: M) -> Result<Self, Error> {
+impl<M: DbMode> Db<M> {
+    fn open(conn: Connection) -> Result<Self, Error> {
         conn.execute_batch("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON")?;
-        Ok(Db { conn, _mode: mode })
+        Ok(Db { conn, _mode: PhantomData })
     }
 
     pub fn len(&self) -> Result<usize, Error> {
@@ -197,14 +202,14 @@ impl<M> Db<M> {
             .query_row(
                 "SELECT seq FROM events WHERE ts <= ?1
                  ORDER BY ts DESC, seq DESC LIMIT 1",
-                [to_micros(t)],
+                [t.as_microsecond()],
                 |row| row.get(0),
             )
             .optional()?;
         Ok(Snapshot {
             conn: &self.conn,
             applied: seq.map_or(0, |seq| seq as usize + 1),
-            valid: to_micros(t),
+            valid: t.as_microsecond(),
         })
     }
 
@@ -212,7 +217,7 @@ impl<M> Db<M> {
         Ok(Snapshot {
             conn: &self.conn,
             applied: self.len()?,
-            valid: to_micros(Timestamp::now()),
+            valid: Timestamp::now().as_microsecond(),
         })
     }
 
@@ -270,14 +275,36 @@ impl<M> Db<M> {
         .collect()
     }
 
+    /// the first event after which `pred` holds, by bisection
+    /// assumes `pred` flips once from false to true along the log
+    /// (the git-bisect contract); probes see `at(seq)`, so pin the
+    /// valid time inside the predicate (`s.valid_at(v)`) to hold it
+    /// fixed while knowledge varies
+    pub fn when<F>(&self, mut pred: F) -> Result<Option<Seq>, Error>
+    where
+        F: FnMut(Snapshot<'_>) -> Result<bool, Error>,
+    {
+        let len = self.len()?;
+        let (mut lo, mut hi) = (0, len);
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if pred(self.at(mid)?)? {
+                hi = mid;
+            } else {
+                lo = mid + 1;
+            }
+        }
+        Ok((lo < len).then_some(lo))
+    }
+
     pub fn close(self) -> Result<(), Error> {
         self.conn.close().map_err(|(_, err)| Error::Sqlite(err))
     }
 }
 
 impl<M: Writable> Db<M> {
-    fn create(conn: Connection, mode: M) -> Result<Self, Error> {
-        let db = Self::open(conn, mode)?;
+    fn create(conn: Connection) -> Result<Self, Error> {
+        let db = Self::open(conn)?;
         db.conn.execute_batch(SCHEMA)?;
         Ok(db)
     }
@@ -299,7 +326,7 @@ impl<M: Writable> Db<M> {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let ts = to_micros(Timestamp::now());
+        let ts = Timestamp::now().as_microsecond();
         let seq: i64 = tx.query_row(
             "INSERT INTO events (seq, ts)
              SELECT coalesce(max(seq) + 1, 0), ?1 FROM events
@@ -344,7 +371,7 @@ impl<M: Writable> Batch<'_, M> {
         valid: Timestamp,
     ) -> Self {
         self.changes
-            .insert((key.into(), Some(to_micros(valid))), Some(value.into()));
+            .insert((key.into(), Some(valid.as_microsecond())), Some(value.into()));
         self
     }
 
@@ -355,7 +382,7 @@ impl<M: Writable> Batch<'_, M> {
 
     pub fn delete_from(mut self, key: impl Into<String>, valid: Timestamp) -> Self {
         self.changes
-            .insert((key.into(), Some(to_micros(valid))), None);
+            .insert((key.into(), Some(valid.as_microsecond())), None);
         self
     }
 
@@ -374,7 +401,7 @@ pub struct Snapshot<'db> {
 impl Snapshot<'_> {
     pub fn valid_at(self, v: Timestamp) -> Self {
         Snapshot {
-            valid: to_micros(v),
+            valid: v.as_microsecond(),
             ..self
         }
     }
@@ -534,17 +561,18 @@ const SCHEMA: &str = "
     ORDER BY c.seq, c.key, c.valid;";
 
 pub fn connect(path: impl AsRef<Path>) -> Result<Db<Durable>, Error> {
-    Db::create(Connection::open(path)?, Durable)
+    Db::create(Connection::open(path)?)
 }
 
 pub fn inspect(path: impl AsRef<Path>) -> Result<Db<ReadOnly>, Error> {
-    let conn = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )?;
-    Db::open(conn, ReadOnly)
+    Db::open(
+        Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?
+    )
 }
 
 pub fn in_memory() -> Result<Db<InMemory>, Error> {
-    Db::create(Connection::open_in_memory()?, InMemory)
+    Db::create(Connection::open_in_memory()?)
 }
