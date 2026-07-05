@@ -427,6 +427,18 @@ impl Snapshot<'_> {
         row.map_or(Ok(None), |(kind, value)| decode(kind, value))
     }
 
+    /// the distinct valid times at which this knowledge state changes:
+    /// the valid axis as a discrete, enumerable set
+    /// a property of `applied` alone, deliberately not bounded by the
+    /// snapshot's valid time, so the scheduled region is included
+    pub fn changepoints(&self) -> Result<Vec<Timestamp>, Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT DISTINCT valid FROM changes WHERE seq < ?1 ORDER BY valid",
+        )?;
+        let rows = stmt.query_map([self.applied as i64], |row| row.get::<_, i64>(0))?;
+        rows.map(|row| from_micros(row?)).collect()
+    }
+
     pub fn entries(&self) -> Result<Vec<(String, Value)>, Error> {
         let mut stmt = self.conn.prepare(&format!(
             "SELECT c.key, c.kind, c.value

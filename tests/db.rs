@@ -207,6 +207,30 @@ fn diff_spans_both_axes() {
 }
 
 #[test]
+fn changepoints_enumerate_the_valid_axis() {
+    let mut db = in_memory().unwrap();
+    assert!(db.latest().unwrap().changepoints().unwrap().is_empty());
+
+    let jan = ts("2020-01-01T00:00:00Z");
+    let mar = ts("2020-03-01T00:00:00Z");
+    let jun = ts("2020-06-01T00:00:00Z");
+    db.batch().set_from("x", "a", jan).commit().unwrap();
+    db.batch().set_from("x", "b", jun).commit().unwrap();
+    db.batch()
+        .set_from("y", true, mar)
+        .set_from("z", 1, jun)
+        .commit()
+        .unwrap();
+
+    assert_eq!(
+        db.latest().unwrap().changepoints().unwrap(),
+        vec![jan, mar, jun]
+    );
+    assert_eq!(db.at(0).unwrap().changepoints().unwrap(), vec![jan]);
+    assert_eq!(db.at(1).unwrap().changepoints().unwrap(), vec![jan, jun]);
+}
+
+#[test]
 fn when_bisects_the_log() {
     let mut db = in_memory().unwrap();
     let above = |db: &Db<_>, thresh: i64| {

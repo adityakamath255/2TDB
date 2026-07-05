@@ -45,7 +45,7 @@ So `db.latest().valid_at(last_year)` is what we now believe was true last year, 
 
 The value at a coordinate is the assertion with the lexicographically greatest `(valid, seq)` among those visible there: one indexed lookup, nothing replayed. A consequence worth internalizing: corrections splice into the timeline rather than overriding everything after them. If the record says `a` since January and `b` since June, a later correction "actually `c` since March" changes March through May and leaves June onward with `b`, because at any valid time the latest valid-from at or before it wins. Re-asserting the same key at the same valid time supersedes that point outright.
 
-Scheduled changes fall out of the same rule: an assertion with a future valid time is invisible to `latest()` until the clock reaches it. `diff(a, b)` reports the keys that differ between any two coordinates, which covers both "what changed in the world" and "what did we learn" depending on which axis the coordinates vary along. `history(key)` lists every assertion ever made about a key; `event(seq)` shows one event as committed.
+Scheduled changes fall out of the same rule: an assertion with a future valid time is invisible to `latest()` until the clock reaches it. `diff(a, b)` reports the keys that differ between any two coordinates, which covers both "what changed in the world" and "what did we learn" depending on which axis the coordinates vary along. `history(key)` lists every assertion ever made about a key; `event(seq)` shows one event as committed. `changepoints()` enumerates the valid axis of a snapshot: the distinct valid times at which its knowledge changes, so between two adjacent ones every read answers identically. It describes the knowledge state, not the view position, so scheduled changes are included.
 
 `when(pred)` bisects the log for the first event after which a predicate on the state holds: log2(n) probes instead of a replay, under the git-bisect contract that the predicate flips once from false to true. Each probe sees `at(seq)`, valid time tracking the event; pinning it inside the predicate asks instead when a fixed moment was first believed to satisfy it:
 
@@ -63,6 +63,8 @@ A store is opened in one of three modes, and the mode is part of its type, so th
 - `in_memory()` is a writable store in a private in-memory database.
 - `connect(path)` is a writable, durable store. Every commit is a SQLite transaction, so it is on disk before `commit` returns and a crash can never leave a partial event. Concurrent connections are safe: SQLite serializes writers and isolates readers.
 - `inspect(path)` opens the database read-only. Code that tries to write to it does not compile.
+
+`cargo run --example scrub -- path.db` opens a TUI scrubber over both axes: `h`/`l` walks the log, `[`/`]` hops between valid-time changepoints, `:`/`@` jump to a typed event number or date on either axis, `n`/`N` walk the selected key's own events, `/` filters keys, and `m` marks a baseline that every later position is diff-colored against.
 
 ## Schema
 

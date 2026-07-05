@@ -15,4 +15,4 @@ rusqlite = { version = "0.40.1", features = ["bundled"] }
 thiserror = "2.0.18"
 
 [dev-dependencies]
-rusqlite = { version = "0.40.1", features = ["bundled"] }
+ratatui = "0.30.2"
