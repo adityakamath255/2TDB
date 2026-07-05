@@ -1,5 +1,3 @@
-//! An append-only, time-travelling key-value store on SQLite. See README.md.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -51,8 +49,6 @@ impl From<&str> for Value {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("timestamp {at} is before the last event at {last}")]
-    Backwards { at: Timestamp, last: Timestamp },
     #[error("no event at seq {seq}: the log holds {len}")]
     OutOfRange { seq: Seq, len: usize },
     #[error("a batch must contain at least one change")]
@@ -73,33 +69,44 @@ fn encode(value: Option<&Value>) -> (Option<i64>, Sql) {
     }
 }
 
-fn decode(kind: Option<i64>, value: Sql) -> Result<Option<Value>, Error> {
+fn decode_value(kind: i64, value: Sql) -> Result<Value, Error> {
     match (kind, value) {
-        (None, Sql::Null) => Ok(None),
-        (Some(0), Sql::Integer(i)) => Ok(Some(Value::Bool(i != 0))),
-        (Some(1), Sql::Integer(i)) => Ok(Some(Value::Int(i))),
-        (Some(2), Sql::Real(f)) => Ok(Some(Value::Float(f))),
-        (Some(3), Sql::Text(s)) => Ok(Some(Value::Str(s))),
+        (0, Sql::Integer(i)) => Ok(Value::Bool(i != 0)),
+        (1, Sql::Integer(i)) => Ok(Value::Int(i)),
+        (2, Sql::Real(f)) => Ok(Value::Float(f)),
+        (3, Sql::Text(s)) => Ok(Value::Str(s)),
         _ => Err(Error::Corrupt),
     }
 }
 
-fn to_nanos(ts: Timestamp) -> i64 {
-    i64::try_from(ts.as_nanosecond()).expect("timestamp fits in i64 nanoseconds")
-}
-
-fn from_nanos(nanos: i64) -> Timestamp {
-    Timestamp::from_nanosecond(nanos as i128).expect("i64 nanoseconds is a valid timestamp")
-}
-
-fn resolve_ts(at: Option<Timestamp>, last: Option<Timestamp>) -> Result<Timestamp, Error> {
-    match (at, last) {
-        (Some(at), Some(last)) if at < last => Err(Error::Backwards { at, last }),
-        (Some(at), _) => Ok(at),
-        (None, None) => Ok(Timestamp::now()),
-        (None, Some(last)) => Ok(Timestamp::now().max(last)),
+fn decode(kind: Option<i64>, value: Sql) -> Result<Option<Value>, Error> {
+    match (kind, value) {
+        (None, Sql::Null) => Ok(None),
+        (None, _) => Err(Error::Corrupt),
+        (Some(kind), value) => decode_value(kind, value).map(Some),
     }
 }
+
+fn to_micros(ts: Timestamp) -> i64 {
+    ts.as_microsecond()
+}
+
+fn from_micros(micros: i64) -> Result<Timestamp, Error> {
+    Timestamp::from_microsecond(micros).map_err(|_| Error::Corrupt)
+}
+
+/// the assertion in force at a coordinate
+/// `valid` and `applied` name the parameter placeholders
+/// the key correlates with the enclosing `keys k`
+fn winner(valid: &str, applied: &str) -> String {
+    format!(
+        "(SELECT w.key, w.valid, w.seq FROM changes w
+           WHERE w.key = k.key AND w.valid <= {valid} AND w.seq < {applied}
+           ORDER BY w.valid DESC, w.seq DESC LIMIT 1)"
+    )
+}
+
+const UNBOUNDED: i64 = i64::MAX;
 
 pub trait Writable {}
 
@@ -114,8 +121,23 @@ impl Writable for InMemory {}
 impl Writable for Durable {}
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Change {
+    pub key: String,
+    pub valid: Timestamp,
+    pub value: Option<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Event {
-    pub changes: BTreeMap<String, Option<Value>>,
+    pub changes: Vec<Change>,
+    pub ts: Timestamp,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Assertion {
+    pub seq: Seq,
+    pub valid: Timestamp,
+    pub value: Option<Value>,
     pub ts: Timestamp,
 }
 
@@ -126,16 +148,16 @@ pub struct Db<M> {
 
 impl<M> Db<M> {
     fn open(conn: Connection, mode: M) -> Result<Self, Error> {
-        conn.execute_batch("PRAGMA busy_timeout = 5000")?;
+        conn.execute_batch("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON")?;
         Ok(Db { conn, _mode: mode })
     }
 
     pub fn len(&self) -> Result<usize, Error> {
-        let len: i64 = self.conn.query_row(
-            "SELECT coalesce(max(seq) + 1, 0) FROM changes",
-            [],
-            |row| row.get(0),
-        )?;
+        let len: i64 =
+            self.conn
+                .query_row("SELECT coalesce(max(seq) + 1, 0) FROM events", [], |row| {
+                    row.get(0)
+                })?;
         Ok(len as usize)
     }
 
@@ -143,67 +165,17 @@ impl<M> Db<M> {
         Ok(self.len()? == 0)
     }
 
-    pub fn at(&self, seq: Seq) -> Result<Snapshot<'_>, Error> {
-        let len = self.len()?;
-        if seq >= len {
-            return Err(Error::OutOfRange { seq, len });
-        }
-        Ok(Snapshot {
-            conn: &self.conn,
-            applied: seq + 1,
-        })
-    }
-
-    pub fn latest(&self) -> Result<Snapshot<'_>, Error> {
-        Ok(Snapshot {
-            conn: &self.conn,
-            applied: self.len()?,
-        })
-    }
-
-    pub fn as_of(&self, t: Timestamp) -> Result<Snapshot<'_>, Error> {
-        let applied: i64 = self.conn.query_row(
-            "WITH RECURSIVE search (lo, hi) AS (
-                 SELECT 0, (SELECT coalesce(max(seq) + 1, 0) FROM changes)
-                 UNION ALL
-                 SELECT
-                     CASE WHEN (SELECT ts FROM changes WHERE seq = (lo + hi) / 2 LIMIT 1) <= ?1
-                          THEN (lo + hi) / 2 + 1 ELSE lo END,
-                     CASE WHEN (SELECT ts FROM changes WHERE seq = (lo + hi) / 2 LIMIT 1) <= ?1
-                          THEN hi ELSE (lo + hi) / 2 END
-                 FROM search WHERE lo < hi
-             )
-             SELECT lo FROM search WHERE lo = hi",
-            [to_nanos(t)],
-            |row| row.get(0),
-        )?;
-        Ok(Snapshot {
-            conn: &self.conn,
-            applied: applied as usize,
-        })
-    }
-
-    pub fn event(&self, seq: Seq) -> Result<Event, Error> {
-        let mut stmt = self.conn.prepare(
-            "SELECT key, kind, value, ts FROM changes WHERE seq = ?1 ORDER BY key",
-        )?;
-        let rows = stmt.query_map([seq as i64], |row| {
-            Ok((
-                row.get::<_, String>(0)?,
-                row.get::<_, Option<i64>>(1)?,
-                row.get::<_, Sql>(2)?,
-                row.get::<_, i64>(3)?,
-            ))
-        })?;
-        let mut changes = BTreeMap::new();
-        let mut ts = None;
-        for row in rows {
-            let (key, kind, value, nanos) = row?;
-            changes.insert(key, decode(kind, value)?);
-            ts = Some(from_nanos(nanos));
-        }
+    fn event_ts(&self, seq: Seq) -> Result<i64, Error> {
+        let ts: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT ts FROM events WHERE seq = ?1",
+                [seq as i64],
+                |row| row.get(0),
+            )
+            .optional()?;
         match ts {
-            Some(ts) => Ok(Event { changes, ts }),
+            Some(ts) => Ok(ts),
             None => Err(Error::OutOfRange {
                 seq,
                 len: self.len()?,
@@ -211,21 +183,89 @@ impl<M> Db<M> {
         }
     }
 
-    pub fn history(&self, key: &str) -> Result<Vec<(Seq, Option<Value>, Timestamp)>, Error> {
+    pub fn at(&self, seq: Seq) -> Result<Snapshot<'_>, Error> {
+        Ok(Snapshot {
+            conn: &self.conn,
+            applied: seq + 1,
+            valid: self.event_ts(seq)?,
+        })
+    }
+
+    pub fn known_at(&self, t: Timestamp) -> Result<Snapshot<'_>, Error> {
+        let seq: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT seq FROM events WHERE ts <= ?1
+                 ORDER BY ts DESC, seq DESC LIMIT 1",
+                [to_micros(t)],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(Snapshot {
+            conn: &self.conn,
+            applied: seq.map_or(0, |seq| seq as usize + 1),
+            valid: to_micros(t),
+        })
+    }
+
+    pub fn latest(&self) -> Result<Snapshot<'_>, Error> {
+        Ok(Snapshot {
+            conn: &self.conn,
+            applied: self.len()?,
+            valid: to_micros(Timestamp::now()),
+        })
+    }
+
+    pub fn event(&self, seq: Seq) -> Result<Event, Error> {
+        let ts = from_micros(self.event_ts(seq)?)?;
         let mut stmt = self.conn.prepare(
-            "SELECT seq, kind, value, ts FROM changes WHERE key = ?1 ORDER BY seq",
+            "SELECT key, valid, kind, value FROM changes
+             WHERE seq = ?1 ORDER BY key, valid",
+        )?;
+        let rows = stmt.query_map([seq as i64], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                row.get::<_, Sql>(3)?,
+            ))
+        })?;
+        let changes = rows
+            .map(|row| {
+                let (key, valid, kind, value) = row?;
+                Ok(Change {
+                    key,
+                    valid: from_micros(valid)?,
+                    value: decode(kind, value)?,
+                })
+            })
+            .collect::<Result<_, Error>>()?;
+        Ok(Event { changes, ts })
+    }
+
+    pub fn history(&self, key: &str) -> Result<Vec<Assertion>, Error> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.seq, c.valid, c.kind, c.value, e.ts
+             FROM changes c JOIN events e ON e.seq = c.seq
+             WHERE c.key = ?1 ORDER BY c.seq, c.valid",
         )?;
         let rows = stmt.query_map([key], |row| {
             Ok((
                 row.get::<_, i64>(0)?,
-                row.get::<_, Option<i64>>(1)?,
-                row.get::<_, Sql>(2)?,
-                row.get::<_, i64>(3)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                row.get::<_, Sql>(3)?,
+                row.get::<_, i64>(4)?,
             ))
         })?;
         rows.map(|row| {
-            let (seq, kind, value, ts) = row?;
-            Ok((seq as Seq, decode(kind, value)?, from_nanos(ts)))
+            let (seq, valid, kind, value, ts) = row?;
+            Ok(Assertion {
+                seq: seq as Seq,
+                valid: from_micros(valid)?,
+                value: decode(kind, value)?,
+                ts: from_micros(ts)?,
+            })
         })
         .collect()
     }
@@ -246,14 +286,12 @@ impl<M: Writable> Db<M> {
         Batch {
             db: self,
             changes: BTreeMap::new(),
-            at: None,
         }
     }
 
     fn commit(
         &mut self,
-        changes: BTreeMap<String, Option<Value>>,
-        at: Option<Timestamp>,
+        changes: BTreeMap<(String, Option<i64>), Option<Value>>,
     ) -> Result<Seq, Error> {
         if changes.is_empty() {
             return Err(Error::Empty);
@@ -261,24 +299,26 @@ impl<M: Writable> Db<M> {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let last: Option<i64> = tx
-            .query_row("SELECT ts FROM changes ORDER BY seq DESC LIMIT 1", [], |row| {
-                row.get(0)
-            })
-            .optional()?;
-        let ts = resolve_ts(at, last.map(from_nanos))?;
+        let ts = to_micros(Timestamp::now());
         let seq: i64 = tx.query_row(
-            "SELECT coalesce(max(seq) + 1, 0) FROM changes",
-            [],
+            "INSERT INTO events (seq, ts)
+             SELECT coalesce(max(seq) + 1, 0), ?1 FROM events
+             RETURNING seq",
+            [ts],
             |row| row.get(0),
         )?;
+        let resolved: BTreeMap<(String, i64), Option<Value>> = changes
+            .into_iter()
+            .map(|((key, valid), value)| ((key, valid.unwrap_or(ts)), value))
+            .collect();
         {
             let mut stmt = tx.prepare(
-                "INSERT INTO changes (seq, key, kind, value, ts) VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO changes (seq, key, valid, kind, value)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
             )?;
-            for (key, value) in &changes {
+            for ((key, valid), value) in &resolved {
                 let (kind, value) = encode(value.as_ref());
-                stmt.execute((seq, key, kind, value, to_nanos(ts)))?;
+                stmt.execute((seq, key, valid, kind, value))?;
             }
         }
         tx.commit()?;
@@ -288,44 +328,72 @@ impl<M: Writable> Db<M> {
 
 pub struct Batch<'db, M: Writable> {
     db: &'db mut Db<M>,
-    changes: BTreeMap<String, Option<Value>>,
-    at: Option<Timestamp>,
+    changes: BTreeMap<(String, Option<i64>), Option<Value>>,
 }
 
 impl<M: Writable> Batch<'_, M> {
     pub fn set(mut self, key: impl Into<String>, value: impl Into<Value>) -> Self {
-        self.changes.insert(key.into(), Some(value.into()));
+        self.changes.insert((key.into(), None), Some(value.into()));
+        self
+    }
+
+    pub fn set_from(
+        mut self,
+        key: impl Into<String>,
+        value: impl Into<Value>,
+        valid: Timestamp,
+    ) -> Self {
+        self.changes
+            .insert((key.into(), Some(to_micros(valid))), Some(value.into()));
         self
     }
 
     pub fn delete(mut self, key: impl Into<String>) -> Self {
-        self.changes.insert(key.into(), None);
+        self.changes.insert((key.into(), None), None);
         self
     }
 
-    pub fn at(mut self, ts: Timestamp) -> Self {
-        self.at = Some(ts);
+    pub fn delete_from(mut self, key: impl Into<String>, valid: Timestamp) -> Self {
+        self.changes
+            .insert((key.into(), Some(to_micros(valid))), None);
         self
     }
 
     pub fn commit(self) -> Result<Seq, Error> {
-        self.db.commit(self.changes, self.at)
+        self.db.commit(self.changes)
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Snapshot<'db> {
     conn: &'db Connection,
     applied: usize,
+    valid: i64,
 }
 
 impl Snapshot<'_> {
+    pub fn valid_at(self, v: Timestamp) -> Self {
+        Snapshot {
+            valid: to_micros(v),
+            ..self
+        }
+    }
+
+    pub fn valid_unbounded(self) -> Self {
+        Snapshot {
+            valid: UNBOUNDED,
+            ..self
+        }
+    }
+
     pub fn get(&self, key: &str) -> Result<Option<Value>, Error> {
         let row = self
             .conn
             .query_row(
                 "SELECT kind, value FROM changes
-                 WHERE key = ?1 AND seq < ?2 ORDER BY seq DESC LIMIT 1",
-                (key, self.applied as i64),
+                 WHERE key = ?1 AND valid <= ?2 AND seq < ?3
+                 ORDER BY valid DESC, seq DESC LIMIT 1",
+                (key, self.valid, self.applied as i64),
                 |row| Ok((row.get::<_, Option<i64>>(0)?, row.get::<_, Sql>(1)?)),
             )
             .optional()?;
@@ -333,24 +401,24 @@ impl Snapshot<'_> {
     }
 
     pub fn entries(&self) -> Result<Vec<(String, Value)>, Error> {
-        let mut stmt = self.conn.prepare(
+        let mut stmt = self.conn.prepare(&format!(
             "SELECT c.key, c.kind, c.value
-             FROM firsts f
-             JOIN changes c ON c.key = f.key
-                 AND c.seq = (SELECT max(seq) FROM changes WHERE key = f.key AND seq < ?1)
-             WHERE f.first < ?1 AND c.value IS NOT NULL
+             FROM keys k
+             JOIN changes c ON (c.key, c.valid, c.seq) = {}
+             WHERE c.kind IS NOT NULL
              ORDER BY c.key",
-        )?;
-        let rows = stmt.query_map([self.applied as i64], |row| {
+            winner("?1", "?2")
+        ))?;
+        let rows = stmt.query_map((self.valid, self.applied as i64), |row| {
             Ok((
                 row.get::<_, String>(0)?,
-                row.get::<_, Option<i64>>(1)?,
+                row.get::<_, i64>(1)?,
                 row.get::<_, Sql>(2)?,
             ))
         })?;
         rows.map(|row| {
             let (key, kind, value) = row?;
-            Ok((key, decode(kind, value)?.ok_or(Error::Corrupt)?))
+            Ok((key, decode_value(kind, value)?))
         })
         .collect()
     }
@@ -359,29 +427,28 @@ impl Snapshot<'_> {
 pub type DiffEntry = (String, Option<Value>, Option<Value>);
 
 pub fn diff(a: &Snapshot<'_>, b: &Snapshot<'_>) -> Result<Vec<DiffEntry>, Error> {
-    let mut stmt = a.conn.prepare(
-        "WITH sides AS (
-             SELECT f.key AS key,
-                 (SELECT max(seq) FROM changes WHERE key = f.key AND seq < ?1) AS sa,
-                 (SELECT max(seq) FROM changes WHERE key = f.key AND seq < ?2) AS sb
-             FROM firsts f WHERE f.first < max(?1, ?2)
-         )
-         SELECT s.key, a.kind, a.value, b.kind, b.value
-         FROM sides s
-         LEFT JOIN changes a ON a.key = s.key AND a.seq = s.sa
-         LEFT JOIN changes b ON b.key = s.key AND b.seq = s.sb
+    let mut stmt = a.conn.prepare(&format!(
+        "SELECT k.key, a.kind, a.value, b.kind, b.value
+         FROM keys k
+         LEFT JOIN changes a ON (a.key, a.valid, a.seq) = {}
+         LEFT JOIN changes b ON (b.key, b.valid, b.seq) = {}
          WHERE a.kind IS NOT b.kind OR a.value IS NOT b.value
-         ORDER BY s.key",
+         ORDER BY k.key",
+        winner("?1", "?2"),
+        winner("?3", "?4")
+    ))?;
+    let rows = stmt.query_map(
+        (a.valid, a.applied as i64, b.valid, b.applied as i64),
+        |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<i64>>(1)?,
+                row.get::<_, Sql>(2)?,
+                row.get::<_, Option<i64>>(3)?,
+                row.get::<_, Sql>(4)?,
+            ))
+        },
     )?;
-    let rows = stmt.query_map([a.applied as i64, b.applied as i64], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, Option<i64>>(1)?,
-            row.get::<_, Sql>(2)?,
-            row.get::<_, Option<i64>>(3)?,
-            row.get::<_, Sql>(4)?,
-        ))
-    })?;
     rows.map(|row| {
         let (key, ka, va, kb, vb) = row?;
         Ok((key, decode(ka, va)?, decode(kb, vb)?))
@@ -390,30 +457,81 @@ pub fn diff(a: &Snapshot<'_>, b: &Snapshot<'_>) -> Result<Vec<DiffEntry>, Error>
 }
 
 const SCHEMA: &str = "
+    CREATE TABLE IF NOT EXISTS events (
+        seq INTEGER PRIMARY KEY,
+        ts  INTEGER NOT NULL
+    ) STRICT;
     CREATE TABLE IF NOT EXISTS changes (
-        seq   INTEGER NOT NULL,
         key   TEXT NOT NULL,
+        valid INTEGER NOT NULL,
+        seq   INTEGER NOT NULL REFERENCES events (seq),
         kind  INTEGER,
         value ANY,
-        ts    INTEGER NOT NULL,
-        PRIMARY KEY (key, seq)
+        PRIMARY KEY (key, valid, seq),
+        CHECK ((kind IS NULL AND value IS NULL)
+            OR (kind IN (0, 1) AND typeof(value) = 'integer')
+            OR (kind = 2 AND typeof(value) = 'real')
+            OR (kind = 3 AND typeof(value) = 'text'))
     ) STRICT, WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS events_by_ts ON events (ts);
     CREATE INDEX IF NOT EXISTS changes_by_seq ON changes (seq, key);
-    CREATE VIEW IF NOT EXISTS firsts (key, first) AS
+
+    CREATE VIEW IF NOT EXISTS keys (key) AS
     WITH RECURSIVE scan (key) AS (
         SELECT min(key) FROM changes
         UNION ALL
         SELECT (SELECT min(key) FROM changes WHERE key > scan.key)
         FROM scan WHERE scan.key IS NOT NULL
     )
-    SELECT key, (SELECT min(seq) FROM changes WHERE key = scan.key)
-    FROM scan WHERE key IS NOT NULL;
-    CREATE VIEW IF NOT EXISTS latest (key, kind, value, seq, ts) AS
-    SELECT c.key, c.kind, c.value, c.seq, c.ts
-    FROM firsts f
-    JOIN changes c ON c.key = f.key
-        AND c.seq = (SELECT max(seq) FROM changes WHERE key = f.key)
-    WHERE c.value IS NOT NULL;";
+    SELECT key FROM scan WHERE key IS NOT NULL;
+
+    -- each key's currently-believed history as half-open valid-time
+    -- intervals; NULL valid_to is open-ended, NULL kind means absent
+    CREATE VIEW IF NOT EXISTS timeline AS
+    SELECT c.key, c.valid AS valid_from,
+           lead(c.valid) OVER (PARTITION BY c.key ORDER BY c.valid) AS valid_to,
+           c.kind, c.value, c.seq
+    FROM changes c
+    WHERE NOT EXISTS (SELECT 1 FROM changes k
+                       WHERE k.key = c.key AND k.valid = c.valid
+                         AND k.seq > c.seq);
+
+    CREATE VIEW IF NOT EXISTS latest AS
+    WITH now (t) AS (SELECT cast(unixepoch('subsec') * 1000000 AS INTEGER))
+    SELECT key, kind, value, seq, valid_from AS valid
+    FROM timeline, now
+    WHERE valid_from <= t AND (valid_to IS NULL OR t < valid_to)
+      AND kind IS NOT NULL;
+
+    CREATE VIEW IF NOT EXISTS scheduled AS
+    WITH now (t) AS (SELECT cast(unixepoch('subsec') * 1000000 AS INTEGER))
+    SELECT key, valid_from AS valid, kind, value, seq
+    FROM timeline, now
+    WHERE valid_from > t;
+
+    CREATE VIEW IF NOT EXISTS corrections AS
+    SELECT c.key, c.seq, c.valid, c.kind, c.value,
+           c.valid < e.ts AS backdated,
+           EXISTS (SELECT 1 FROM changes p
+                    WHERE p.key = c.key AND p.valid = c.valid
+                      AND p.seq < c.seq) AS supersedes
+    FROM changes c JOIN events e ON e.seq = c.seq
+    WHERE c.valid < e.ts
+       OR EXISTS (SELECT 1 FROM changes p
+                   WHERE p.key = c.key AND p.valid = c.valid
+                     AND p.seq < c.seq);
+
+    CREATE VIEW IF NOT EXISTS assertions AS
+    SELECT c.seq, c.key,
+           CASE c.kind WHEN 0 THEN 'bool' WHEN 1 THEN 'int'
+                       WHEN 2 THEN 'float' WHEN 3 THEN 'str'
+                       ELSE 'delete' END AS type,
+           c.value,
+           strftime('%Y-%m-%dT%H:%M:%f', c.valid / 1000000.0, 'unixepoch')
+               AS valid,
+           strftime('%Y-%m-%dT%H:%M:%f', e.ts / 1000000.0, 'unixepoch') AS ts
+    FROM changes c JOIN events e ON e.seq = c.seq
+    ORDER BY c.seq, c.key, c.valid;";
 
 pub fn connect(path: impl AsRef<Path>) -> Result<Db<Durable>, Error> {
     Db::create(Connection::open(path)?, Durable)
