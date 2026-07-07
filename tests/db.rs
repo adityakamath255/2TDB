@@ -304,6 +304,37 @@ fn blame_names_the_assertion_in_force() {
 }
 
 #[test]
+fn empty_store_is_empty_until_the_first_commit() {
+    let mut db = in_memory().unwrap();
+    assert!(db.is_empty().unwrap());
+    db.batch().set("x", 1).commit().unwrap();
+    assert!(!db.is_empty().unwrap());
+}
+
+#[test]
+fn a_snapshot_reports_its_coordinates() {
+    let mut db = in_memory().unwrap();
+    db.batch().set("x", 1).commit().unwrap();
+    let v = ts("2030-01-01T00:00:00Z");
+    let snap = db.at(0).unwrap();
+    assert_eq!(snap.seq(), Some(0));
+    assert_eq!(snap.valid_at(v).valid(), Some(v));
+    assert_eq!(snap.valid_unbounded().valid(), None);
+}
+
+#[test]
+fn keys_enumerate_every_key_ever_asserted() {
+    let mut db = in_memory().unwrap();
+    assert!(db.keys().unwrap().is_empty());
+
+    db.batch().set("b", 1).set("a", 2).commit().unwrap();
+    db.batch().delete("a").set("c", 3).commit().unwrap();
+
+    // ascending, and a deleted key still counts as ever-asserted
+    assert_eq!(db.keys().unwrap(), vec!["a", "b", "c"]);
+}
+
+#[test]
 fn history_reports_raw_assertions() {
     let mut db = in_memory().unwrap();
     let v = ts("2020-01-01T00:00:00Z");
@@ -414,6 +445,10 @@ fn commits_persist_and_the_views_answer_plain_sql() {
     db.close().unwrap();
 
     let conn = rusqlite::Connection::open(&path).unwrap();
+    let mode: String = conn
+        .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(mode, "wal");
     let current: Vec<String> = conn
         .prepare("SELECT key FROM latest ORDER BY key")
         .unwrap()

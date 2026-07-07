@@ -273,6 +273,12 @@ impl<M: DbMode> Db<M> {
         Ok(Event { changes, ts })
     }
 
+    pub fn keys(&self) -> Result<Vec<String>, Error> {
+        let mut stmt = self.conn.prepare("SELECT key FROM keys")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        rows.collect::<rusqlite::Result<_>>().map_err(Error::from)
+    }
+
     pub fn history(&self, key: &str) -> Result<Vec<Assertion>, Error> {
         let mut stmt = self.conn.prepare(
             "SELECT c.seq, c.valid, c.kind, c.value, e.ts
@@ -407,13 +413,12 @@ pub struct Snapshot<'db> {
 }
 
 impl Snapshot<'_> {
-    /// the coordinate on the transaction axis: the last applied event,
-    /// `None` before any
+    /// the last applied event,
     pub fn seq(&self) -> Option<Seq> {
         (self.applied > 0).then(|| self.applied - 1)
     }
 
-    /// the coordinate on the valid axis, `None` when unbounded
+    /// the coordinate on the valid axis
     pub fn valid(&self) -> Option<Timestamp> {
         Timestamp::from_microsecond(self.valid).ok()
     }
@@ -446,9 +451,6 @@ impl Snapshot<'_> {
         row.map_or(Ok(None), |(kind, value)| decode(kind, value))
     }
 
-    /// the assertion `get` reads at this coordinate; `None` when the key
-    /// has never been asserted here, an assertion with `value: None` when
-    /// the key is absent because that event deleted it
     pub fn blame(&self, key: &str) -> Result<Option<Assertion>, Error> {
         let row = self
             .conn
@@ -465,7 +467,7 @@ impl Snapshot<'_> {
     }
 
     /// the distinct valid times at which this knowledge state changes:
-    /// the valid axis as a discrete, enumerable set
+    /// the valid axis as a discrete & enumerable set
     /// a property of `applied` alone, deliberately not bounded by the
     /// snapshot's valid time, so the scheduled region is included
     pub fn changepoints(&self) -> Result<Vec<Timestamp>, Error> {
@@ -612,7 +614,9 @@ const SCHEMA: &str = "
     ORDER BY c.seq, c.key, c.valid;";
 
 pub fn connect(path: impl AsRef<Path>) -> Result<Db<Durable>, Error> {
-    Db::create(Connection::open(path)?)
+    let db = Db::create(Connection::open(path)?)?;
+    db.conn.pragma_update(None, "journal_mode", "WAL")?;
+    Ok(db)
 }
 
 pub fn inspect(path: impl AsRef<Path>) -> Result<Db<ReadOnly>, Error> {
