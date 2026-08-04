@@ -10,16 +10,19 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Row, Table, TableState};
 use ratatui::{DefaultTerminal, Frame};
 
-use time_travel_db_rs::{Db, Error, ReadOnly, Seq, Snapshot, Timestamp, Value, diff, inspect};
+use time_travel_db_rs::{
+    Assertion, Delta, Error, EventId, Reader, RecordedAssertion, Snapshot, State, Timestamp, Value,
+};
 
-const FOOTER: &str = " tx: h/l ±1 · H/L ±10 · g/G first/latest · :event-or-date jump · n/N selected key's events
+const FOOTER: &str =
+    " tx: h/l ±1 · H/L ±10 · g/G first/latest · :event-or-date jump · n/N selected key's events
  valid: [/] changepoint hop · @date pin · v follow events · u unbounded
  ui: j/k select · / filter · ⏎ history · m diff anchor · d diff-only · esc dismiss · q quit";
 const PROMPT_HELP: &str = " enter apply · esc cancel";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = env::args().nth(1).ok_or("usage: scrub <database>")?;
-    let db = inspect(path)?;
+    let db = Reader::inspect(path)?;
     let screen = Screen::open(&db)?;
     let mut app = App { db, screen };
     let mut terminal = ratatui::init();
@@ -36,32 +39,36 @@ enum ValidMode {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-struct Cursor {
-    len: Seq,
-    seq: Seq,
+struct Position {
+    event: EventId,
     valid: ValidMode,
 }
 
-impl Cursor {
-    fn step(self, delta: Seq) -> Self {
-        self.jump(self.seq.saturating_add(delta))
+impl Position {
+    fn step(self, delta: i64, latest_event: EventId) -> Self {
+        let event = if delta < 0 {
+            self.event.saturating_sub(delta.unsigned_abs())
+        } else {
+            self.event.saturating_add(delta as u64)
+        };
+        self.jump(event, latest_event)
     }
 
-    fn jump(self, seq: Seq) -> Self {
-        Cursor {
-            seq: seq.clamp(0, self.len - 1),
+    fn jump(self, event: EventId, latest_event: EventId) -> Self {
+        Position {
+            event: event.clamp(1, latest_event),
             ..self
         }
     }
 
     fn with_valid(self, valid: ValidMode) -> Self {
-        Cursor { valid, ..self }
+        Position { valid, ..self }
     }
 }
 
 #[derive(Clone, Copy, PartialEq)]
-struct Anchor {
-    at: Cursor,
+struct Comparison {
+    position: Position,
     diff_only: bool,
 }
 
@@ -78,14 +85,14 @@ struct Prompt {
 }
 
 enum Command {
-    Jump(Seq),
+    Jump(EventId),
     JumpTo(Timestamp),
     Pin(Timestamp),
     Filter(Option<String>),
 }
 
 struct App {
-    db: Db<ReadOnly>,
+    db: Reader,
     screen: Screen,
 }
 
@@ -95,8 +102,8 @@ enum Screen {
 }
 
 struct Loaded {
-    cursor: Cursor,
-    anchor: Option<Anchor>,
+    position: Position,
+    comparison: Option<Comparison>,
     selected: Option<String>,
     history: Option<String>,
     prompt: Option<Prompt>,
@@ -104,18 +111,17 @@ struct Loaded {
 }
 
 impl Screen {
-    fn open(db: &Db<ReadOnly>) -> Result<Self, Error> {
+    fn open(db: &Reader) -> Result<Self, Error> {
         let len = db.len()?;
         Ok(if len == 0 {
             Screen::Empty
         } else {
             Screen::Loaded(Loaded {
-                cursor: Cursor {
-                    len,
-                    seq: len - 1,
+                position: Position {
+                    event: len,
                     valid: ValidMode::Track,
                 },
-                anchor: None,
+                comparison: None,
                 selected: None,
                 history: None,
                 prompt: None,
@@ -125,9 +131,9 @@ impl Screen {
     }
 }
 
-fn snapshot<'db>(db: &'db Db<ReadOnly>, cursor: Cursor) -> Result<Snapshot<'db>, Error> {
-    let snap = db.at(cursor.seq)?;
-    Ok(match cursor.valid {
+fn snapshot<'db>(db: &'db Reader, position: Position) -> Result<Snapshot<'db>, Error> {
+    let snap = db.at(position.event)?;
+    Ok(match position.valid {
         ValidMode::Track => snap,
         ValidMode::Pinned(t) => snap.valid_at(t),
         ValidMode::Unbounded => snap.valid_unbounded(),
@@ -164,21 +170,17 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> Result<(), Box<dyn std:
 }
 
 impl Loaded {
-    fn key(&mut self, db: &Db<ReadOnly>, code: KeyCode, rows: &[RowData]) -> Result<(), Error> {
+    fn key(&mut self, db: &Reader, code: KeyCode, rows: &[RowData]) -> Result<(), Error> {
         match code {
-            KeyCode::Char('h') | KeyCode::Left => self.cursor = self.cursor.step(-1),
-            KeyCode::Char('l') | KeyCode::Right => self.cursor = self.cursor.step(1),
-            KeyCode::Char('H') => self.cursor = self.cursor.step(-10),
-            KeyCode::Char('L') => self.cursor = self.cursor.step(10),
-            KeyCode::Char('g') => self.cursor = self.cursor.jump(0),
+            KeyCode::Char('h') | KeyCode::Left => self.step_event(db, -1)?,
+            KeyCode::Char('l') | KeyCode::Right => self.step_event(db, 1)?,
+            KeyCode::Char('H') => self.step_event(db, -10)?,
+            KeyCode::Char('L') => self.step_event(db, 10)?,
+            KeyCode::Char('g') => self.jump_event(db, 1)?,
             KeyCode::Char('G') => {
-                let len = db.len()?;
-                if len > 0 {
-                    self.cursor = Cursor {
-                        len,
-                        seq: len - 1,
-                        ..self.cursor
-                    };
+                let latest_event = db.len()?;
+                if latest_event > 0 {
+                    self.position = self.position.jump(latest_event, latest_event);
                 }
             }
             KeyCode::Char(':') => {
@@ -200,27 +202,27 @@ impl Loaded {
                 })
             }
             KeyCode::Char('d') => {
-                if let Some(anchor) = &mut self.anchor {
-                    anchor.diff_only = !anchor.diff_only;
+                if let Some(comparison) = &mut self.comparison {
+                    comparison.diff_only = !comparison.diff_only;
                 }
             }
             KeyCode::Char('n') => self.step_key_event(db, 1)?,
             KeyCode::Char('N') => self.step_key_event(db, -1)?,
             KeyCode::Char('[') => self.step_valid(db, -1)?,
             KeyCode::Char(']') => self.step_valid(db, 1)?,
-            KeyCode::Char('v') => self.cursor = self.cursor.with_valid(ValidMode::Track),
+            KeyCode::Char('v') => self.position = self.position.with_valid(ValidMode::Track),
             KeyCode::Char('u') => {
-                let mode = match self.cursor.valid {
+                let mode = match self.position.valid {
                     ValidMode::Unbounded => ValidMode::Track,
                     _ => ValidMode::Unbounded,
                 };
-                self.cursor = self.cursor.with_valid(mode);
+                self.position = self.position.with_valid(mode);
             }
             KeyCode::Char('m') => {
-                self.anchor = match self.anchor {
-                    Some(a) if a.at == self.cursor => None,
-                    _ => Some(Anchor {
-                        at: self.cursor,
+                self.comparison = match self.comparison {
+                    Some(comparison) if comparison.position == self.position => None,
+                    _ => Some(Comparison {
+                        position: self.position,
                         diff_only: false,
                     }),
                 };
@@ -234,7 +236,7 @@ impl Loaded {
                 } else if self.filter.is_some() {
                     self.filter = None;
                 } else {
-                    self.anchor = None;
+                    self.comparison = None;
                 }
             }
             _ => {}
@@ -242,7 +244,7 @@ impl Loaded {
         Ok(())
     }
 
-    fn prompt_key(&mut self, db: &Db<ReadOnly>, code: KeyCode) -> Result<(), Error> {
+    fn prompt_key(&mut self, db: &Reader, code: KeyCode) -> Result<(), Error> {
         let Some(prompt) = &mut self.prompt else {
             return Ok(());
         };
@@ -263,53 +265,64 @@ impl Loaded {
         Ok(())
     }
 
-    fn exec(&mut self, db: &Db<ReadOnly>, cmd: Command) -> Result<(), Error> {
+    fn exec(&mut self, db: &Reader, cmd: Command) -> Result<(), Error> {
         match cmd {
-            Command::Jump(seq) => self.cursor = self.cursor.jump(seq),
+            Command::Jump(id) => self.jump_event(db, id)?,
             Command::JumpTo(t) => {
-                if let Some(seq) = db.known_at(t)?.seq() {
-                    self.cursor = self.cursor.jump(seq);
+                if let Some(id) = db.known_at(t)?.event_id() {
+                    self.jump_event(db, id)?;
                 }
             }
-            Command::Pin(t) => self.cursor = self.cursor.with_valid(ValidMode::Pinned(t)),
+            Command::Pin(t) => {
+                self.position = self.position.with_valid(ValidMode::Pinned(t));
+            }
             Command::Filter(f) => self.filter = f,
         }
         Ok(())
     }
 
-    fn step_key_event(&mut self, db: &Db<ReadOnly>, dir: Seq) -> Result<(), Error> {
+    fn step_event(&mut self, db: &Reader, delta: i64) -> Result<(), Error> {
+        self.position = self.position.step(delta, db.len()?);
+        Ok(())
+    }
+
+    fn jump_event(&mut self, db: &Reader, event: EventId) -> Result<(), Error> {
+        self.position = self.position.jump(event, db.len()?);
+        Ok(())
+    }
+
+    fn step_key_event(&mut self, db: &Reader, dir: i64) -> Result<(), Error> {
         let Some(key) = self.selected.as_deref() else {
             return Ok(());
         };
-        let cur = self.cursor;
-        let seqs: Vec<Seq> = db
+        let current = self.position;
+        let ids: Vec<EventId> = db
             .history(key)?
             .iter()
-            .map(|a| a.seq)
-            .filter(|&s| s < cur.len)
+            .map(|record| record.event_id)
             .collect();
         let target = if dir > 0 {
-            seqs.iter().find(|&&s| s > cur.seq)
+            ids.iter().find(|&&id| id > current.event)
         } else {
-            seqs.iter().rev().find(|&&s| s < cur.seq)
+            ids.iter().rev().find(|&&id| id < current.event)
         };
-        if let Some(&s) = target {
-            self.cursor = cur.jump(s);
+        if let Some(&id) = target {
+            self.jump_event(db, id)?;
         }
         Ok(())
     }
 
-    fn step_valid(&mut self, db: &Db<ReadOnly>, dir: Seq) -> Result<(), Error> {
-        let snap = snapshot(db, self.cursor)?;
+    fn step_valid(&mut self, db: &Reader, dir: i64) -> Result<(), Error> {
+        let snap = snapshot(db, self.position)?;
         let points = snap.changepoints()?;
-        let target = match (dir > 0, snap.valid()) {
+        let target = match (dir > 0, snap.valid_through()) {
             (true, Some(t)) => points.iter().find(|&&p| p > t),
             (true, None) => None,
             (false, Some(t)) => points.iter().rev().find(|&&p| p < t),
             (false, None) => points.last(),
         };
         if let Some(&t) = target {
-            self.cursor = self.cursor.with_valid(ValidMode::Pinned(t));
+            self.position = self.position.with_valid(ValidMode::Pinned(t));
         }
         Ok(())
     }
@@ -417,144 +430,201 @@ fn fmt_valid(mode: ValidMode) -> String {
     }
 }
 
-fn build(db: &Db<ReadOnly>, screen: &Screen) -> Result<View, Error> {
-    let Screen::Loaded(st) = screen else {
-        return Ok(View {
+struct LoadedData {
+    latest_event: EventId,
+    committed_at: Timestamp,
+    state: State,
+    diff: BTreeMap<String, Delta>,
+    context: ContextData,
+}
+
+enum ContextData {
+    Event(Vec<Assertion>),
+    History {
+        key: String,
+        records: Vec<RecordedAssertion>,
+    },
+}
+
+fn load(db: &Reader, state: &Loaded) -> Result<LoadedData, Error> {
+    let current = snapshot(db, state.position)?;
+    let event = db.event(state.position.event)?;
+    let diff = match state.comparison {
+        Some(comparison) => snapshot(db, comparison.position)?.diff(&current)?,
+        None => BTreeMap::new(),
+    };
+    let context = match &state.history {
+        Some(key) => ContextData::History {
+            key: key.clone(),
+            records: db.history(key)?,
+        },
+        None => ContextData::Event(event.assertions),
+    };
+
+    Ok(LoadedData {
+        latest_event: db.len()?,
+        committed_at: event.committed_at,
+        state: current.state()?,
+        diff,
+        context,
+    })
+}
+
+fn build(db: &Reader, screen: &Screen) -> Result<View, Error> {
+    match screen {
+        Screen::Empty => Ok(View {
             status: vec![StatusSpan::plain(" empty store · G to re-check")],
             rows: vec![],
             selected: None,
             context_title: String::new(),
             context: vec![],
             prompt: None,
-        });
-    };
-    let prompt = st.prompt.as_ref().map(|p| {
-        let prefix = match p.kind {
+        }),
+        Screen::Loaded(state) => Ok(present(state, load(db, state)?)),
+    }
+}
+
+fn present(state: &Loaded, data: LoadedData) -> View {
+    let rows = state_rows(state, data.state, data.diff);
+    let selected = state
+        .selected
+        .as_ref()
+        .and_then(|key| rows.iter().position(|row| &row.key == key));
+    let (context_title, context) = context(state.position.event, data.context);
+
+    View {
+        status: status(state, data.latest_event, data.committed_at),
+        rows,
+        selected,
+        context_title,
+        context,
+        prompt: prompt(state.prompt.as_ref()),
+    }
+}
+
+fn prompt(prompt: Option<&Prompt>) -> Option<String> {
+    prompt.map(|prompt| {
+        let prefix = match prompt.kind {
             PromptKind::Tx => ':',
             PromptKind::Valid => '@',
             PromptKind::Filter => '/',
         };
-        format!(" {prefix}{}▏", p.buffer)
-    });
-    let snap = snapshot(db, st.cursor)?;
-    let ev = db.event(st.cursor.seq)?;
+        format!(" {prefix}{}▏", prompt.buffer)
+    })
+}
 
-    let mut status = vec![StatusSpan::plain(format!(
+fn status(state: &Loaded, latest_event: EventId, committed_at: Timestamp) -> Vec<StatusSpan> {
+    let mut spans = vec![StatusSpan::plain(format!(
         " event {}/{} · {} · valid: {}",
-        st.cursor.seq,
-        st.cursor.len - 1,
-        ev.ts,
-        fmt_valid(st.cursor.valid)
+        state.position.event,
+        latest_event,
+        committed_at,
+        fmt_valid(state.position.valid)
     ))];
-    if let Some(anchor) = st.anchor {
-        status.push(StatusSpan::plain(format!(
+    if let Some(comparison) = state.comparison {
+        spans.push(StatusSpan::plain(format!(
             " · vs event {} ({})",
-            anchor.at.seq,
-            fmt_valid(anchor.at.valid)
+            comparison.position.event,
+            fmt_valid(comparison.position.valid)
         )));
     }
-    if let Some(f) = &st.filter {
-        status.push(StatusSpan::plain(format!(" · /{f}")));
+    if let Some(filter) = &state.filter {
+        spans.push(StatusSpan::plain(format!(" · /{filter}")));
     }
-    if let Some(anchor) = st.anchor {
-        if anchor.diff_only {
-            status.push(StatusSpan::plain(" · diff-only"));
+    if let Some(comparison) = state.comparison {
+        if comparison.diff_only {
+            spans.push(StatusSpan::plain(" · diff-only"));
         }
-        status.push(StatusSpan::colored(" · changed", Color::Yellow));
-        status.push(StatusSpan::colored(" +added", Color::Green));
-        status.push(StatusSpan::colored(" -dropped", Color::Red));
+        spans.push(StatusSpan::colored(" · changed", Color::Yellow));
+        spans.push(StatusSpan::colored(" +added", Color::Green));
+        spans.push(StatusSpan::colored(" -dropped", Color::Red));
     }
+    spans
+}
 
+fn state_rows(state: &Loaded, current: State, diff: BTreeMap<String, Delta>) -> Vec<RowData> {
     let mut marks: BTreeMap<String, Mark> = BTreeMap::new();
     let mut dropped: Vec<RowData> = vec![];
-    if let Some(anchor) = st.anchor {
-        for entry in diff(&snapshot(db, anchor.at)?, &snap)? {
-            match (entry.before, entry.after) {
-                (None, Some(_)) => {
-                    marks.insert(entry.key, Mark::Added);
-                }
-                (Some(old), None) => dropped.push(RowData {
-                    kind: kind_name(&old),
-                    value: fmt_value(&old),
-                    key: entry.key,
-                    mark: Mark::Dropped,
-                }),
-                _ => {
-                    marks.insert(entry.key, Mark::Changed);
-                }
+    for (key, delta) in diff {
+        match delta {
+            Delta::Added(_) => {
+                marks.insert(key, Mark::Added);
+            }
+            Delta::Removed(value) => dropped.push(RowData {
+                kind: kind_name(&value),
+                value: fmt_value(&value),
+                key,
+                mark: Mark::Dropped,
+            }),
+            Delta::Changed { .. } => {
+                marks.insert(key, Mark::Changed);
             }
         }
     }
 
-    let mut rows: Vec<RowData> = snap
-        .entries()?
+    let mut rows: Vec<RowData> = current
         .into_iter()
-        .map(|e| RowData {
-            mark: marks.get(&e.key).copied().unwrap_or(Mark::Same),
-            kind: kind_name(&e.value),
-            value: fmt_value(&e.value),
-            key: e.key,
+        .map(|(key, value)| RowData {
+            mark: marks.get(&key).copied().unwrap_or(Mark::Same),
+            kind: kind_name(&value),
+            value: fmt_value(&value),
+            key,
         })
         .collect();
     rows.extend(dropped);
     rows.sort_by(|a, b| a.key.cmp(&b.key));
-    if let Some(f) = &st.filter {
-        rows.retain(|r| r.key.contains(f.as_str()));
+    if let Some(filter) = &state.filter {
+        rows.retain(|row| row.key.contains(filter.as_str()));
     }
-    if st.anchor.is_some_and(|a| a.diff_only) {
-        rows.retain(|r| r.mark != Mark::Same);
+    if state
+        .comparison
+        .is_some_and(|comparison| comparison.diff_only)
+    {
+        rows.retain(|row| row.mark != Mark::Same);
     }
+    rows
+}
 
-    let selected = st
-        .selected
-        .as_ref()
-        .and_then(|key| rows.iter().position(|r| &r.key == key));
-
-    let (context_title, context) = match &st.history {
-        Some(key) => {
-            let lines = db
-                .history(key)?
+fn context(event: EventId, data: ContextData) -> (String, Vec<ContextLine>) {
+    match data {
+        ContextData::History { key, records } => {
+            let lines = records
                 .into_iter()
-                .map(|a| {
-                    let what = match &a.value {
-                        Some(v) => format!("= {}", fmt_value(v)),
+                .map(|record| {
+                    let what = match &record.assertion.value {
+                        Some(value) => format!("= {}", fmt_value(value)),
                         None => "deleted".into(),
                     };
                     ContextLine {
-                        text: format!("#{} {} · valid {} · at {}", a.seq, what, a.valid, a.ts),
-                        pending: a.seq > st.cursor.seq,
+                        text: format!(
+                            "#{} {} · valid {} · at {}",
+                            record.event_id, what, record.assertion.valid_from, record.committed_at
+                        ),
+                        pending: record.event_id > event,
                     }
                 })
                 .collect();
             (format!("history · {key}"), lines)
         }
-        None => {
-            let lines = ev
-                .changes
-                .iter()
-                .map(|c| {
-                    let what = match &c.value {
-                        Some(v) => format!("set {} = {}", c.key, fmt_value(v)),
-                        None => format!("del {}", c.key),
+        ContextData::Event(assertions) => {
+            let lines = assertions
+                .into_iter()
+                .map(|assertion| {
+                    let what = match &assertion.value {
+                        Some(value) => {
+                            format!("set {} = {}", assertion.key, fmt_value(value))
+                        }
+                        None => format!("del {}", assertion.key),
                     };
                     ContextLine {
-                        text: format!("{what} · valid {}", c.valid),
+                        text: format!("{what} · valid {}", assertion.valid_from),
                         pending: false,
                     }
                 })
                 .collect();
-            (format!("event {}", st.cursor.seq), lines)
+            (format!("event {event}"), lines)
         }
-    };
-
-    Ok(View {
-        status,
-        rows,
-        selected,
-        context_title,
-        context,
-        prompt,
-    })
+    }
 }
 
 fn draw(frame: &mut Frame, view: &View) {
