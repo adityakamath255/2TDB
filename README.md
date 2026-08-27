@@ -1,160 +1,104 @@
-# time-travel-db-rs
+# 2TDB
 
-An append-only, bitemporal key-value store on SQLite. Every write is an event appended to a log, and state is never mutated in place. A read happens at a coordinate on two time axes: transaction time (what the store knew, and when) and valid time (what was true in the world, and when). Snapshots are coordinates, not copies, answered by indexed queries rather than materialized maps, so any point in either time stays cheap to reach no matter how large the log grows.
+2TDB is a bitemporal key-value store written in Rust and backed by SQLite. Each commit adds an event to the log. Reads select a transaction time and a valid time, which supports historical snapshots, corrections to past facts, scheduled changes, diffs, and audit queries.
 
-It began as a Rust rewrite of a small Python original, written as a study in software design.
+The project began as a Rust rewrite of a smaller Python implementation.
 
 ## Usage
 
 ```rust
-use time_travel_db_rs::{Batch, Database, Value, Write};
+use two_tdb::{Batch, Database, Value, Write};
 
-let mut db = Database::memory().unwrap();
-db.commit(Batch::new(Write::set("votes", 1))).unwrap();
-db.commit(Batch::new(Write::set("votes", 2))).unwrap();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut db = Database::memory()?;
 
-// the state right after the first event
-assert_eq!(db.at(1).unwrap().get("votes").unwrap(), Some(Value::Int(1)));
-// the current state
-assert_eq!(db.latest().unwrap().get("votes").unwrap(), Some(Value::Int(2)));
+    let first = db.commit(Batch::new(Write::set("votes", 1)))?;
+    db.commit(Batch::new(Write::set("votes", 2)))?;
+
+    assert_eq!(db.at(first)?.get("votes")?, Some(Value::Int(1)));
+    assert_eq!(db.latest()?.get("votes")?, Some(Value::Int(2)));
+
+    Ok(())
+}
 ```
 
-A write is a batch of assertions that commit together as one atomic event. Each assertion says: this key holds this value from this valid time onward. `Write::set` and `Write::delete` default the valid time to the commit time; `set_at` and `delete_at` choose it, in the past to correct the record or in the future to schedule a change:
+`Database::memory()` creates an in-memory store. `Database::open(path)` creates or opens a file-backed store. A commit takes a non-empty `Batch` and records its assertions in one SQLite transaction.
 
-```rust
-let writes = Batch::new(Write::set("name", "ada"))
-    .and(Write::set_at("employer", "acme", march))
-    .and(Write::delete_at("discount", next_month));
-db.commit(writes).unwrap();
+`Write::set` and `Write::delete` use the commit timestamp as their valid time. `Write::set_at` and `Write::delete_at` accept a caller-supplied valid time for corrections and scheduled changes.
+
+## Time model
+
+The two axes answer different questions:
+
+- Transaction time records when the database learnt an assertion. The store assigns an event ID and commit timestamp.
+- Valid time records when the assertion holds in the modeled domain. The caller may place it in the past or future.
+
+A `Snapshot` contains one cutoff on each axis:
+
+- `at(id)` includes events through `id` and uses that event's commit timestamp as the valid-time cutoff.
+- `known_at(time)` includes the events known by `time` and uses `time` as the valid-time cutoff.
+- `latest()` includes the latest event and uses the current time as the valid-time cutoff.
+- `valid_at(time)` changes only the valid-time cutoff of an existing snapshot.
+- `valid_unbounded()` includes valid times beyond the current clock.
+
+For a key at transaction cutoff `T` and valid-time cutoff `V`, `get` selects the assertion with the greatest `(valid, event ID)` where `valid <= V` and `event ID <= T`. The query uses the primary-key index; it does not replay the event log.
+
+This rule preserves later valid-time assertions when a correction is recorded. If a key is `a` from January and `b` from June, a later assertion of `c` from March makes the value `c` from March through May. The June assertion still wins from June onward.
+
+## API
+
+The public API separates writes, snapshots, and log inspection:
+
+- `Batch` groups assertions into one atomic event. Its required first `Write` makes an empty batch unrepresentable.
+- `Database` can commit and read. `Reader::inspect(path)` opens the same store read-only; its type has no `commit` method.
+- `Snapshot::get` reads one key. `state` returns all values at the coordinate, and `diff` compares two coordinates.
+- `blame` returns the assertion selected for a key, including the deleting assertion when a key is absent. It returns `None` when the key was never asserted.
+- `changepoints` lists the valid times known at the snapshot's transaction cutoff.
+- `event`, `history`, and `keys` inspect the append-only log.
+- `bisect` finds the first event at which a monotonic predicate becomes true.
+
+Values may be booleans, signed 64-bit integers, 64-bit floats, or strings. A deletion is stored as an assertion without a value.
+
+## Storage
+
+The library writes two tables, both defined in [`src/schema.sql`](src/schema.sql):
+
+- `events` stores the event ID and transaction timestamp.
+- `changes` stores the key, valid timestamp, event ID, value kind, and value. Its primary key is `(key, valid, event ID)`.
+
+The library only inserts into these tables. File-backed writable connections use WAL mode, and each batch commits with an immediate SQLite transaction. The schema uses `STRICT` tables and a `CHECK` constraint to keep each value's kind consistent with its SQLite storage type.
+
+The schema also installs `latest`, `timeline`, `scheduled`, `corrections`, `assertions`, and `keys` views for direct inspection with SQLite tools. The `latest` and `scheduled` views read the clock for each query. A Rust snapshot returned by `latest()` retains the cutoff chosen when the snapshot was created.
+
+Timestamps are stored as signed 64-bit microseconds since the Unix epoch. Input with finer precision is truncated.
+
+## TUI scrubber
+
+The `scrub` example opens a database through the read-only `Reader` API:
+
+```bash
+cargo run --example scrub -- path.db
 ```
 
-## Two time axes
+It can move independently through event and valid time, inspect a key's history, filter keys, and compare the current position with a marked snapshot. The footer lists the active key bindings.
 
-Transaction time is when the store learnt something. It is store-assigned at commit and never caller-controlled, which is what makes the log an honest audit record. Valid time is when something holds in the modeled world, and it is entirely the caller's: any assertion may place its valid time anywhere.
+## Tests
 
-A `Snapshot` is one coordinate on both axes. Constructors pick the transaction time and default the valid time to match it, so each reads as "the world as it stood, as it was then known":
+The project uses the Rust 2024 edition and bundles SQLite through `rusqlite`. Run the test suite with:
 
-- `at(id)` is the store right after a given event. Event IDs start at 1.
-- `known_at(t)` is the store as it was known at a wall-clock time.
-- `latest()` is everything known, valid as of now.
-- `valid_at(v)` re-views the same knowledge at another valid time; `valid_unbounded()` lifts the bound so scheduled future changes show.
-
-So `db.latest().valid_at(last_year)` is what we now believe was true last year, and `db.at(3).valid_at(last_year)` is what we believed about last year back then.
-
-The value at a coordinate is the assertion with the lexicographically greatest `(valid, seq)` among those visible there: one indexed lookup, nothing replayed. A consequence worth internalizing: corrections splice into the timeline rather than overriding everything after them. If the record says `a` since January and `b` since June, a later correction "actually `c` since March" changes March through May and leaves June onward with `b`, because at any valid time the latest valid-from at or before it wins. Re-asserting the same key at the same valid time supersedes that point outright.
-
-Scheduled changes fall out of the same rule: an assertion with a future valid time is invisible to `latest()` until the clock reaches it. `a.diff(&b)` reports the keys that differ between any two coordinates, using `Added`, `Removed`, and `Changed` variants. `state()` returns the full coordinate as a sorted map. `history(key)` lists every assertion ever made about a key; `keys()` lists every key ever asserted; `event(id)` shows one event as committed. `blame(key)` on a snapshot names the winning assertion itself (value, valid time, event, commit time), git blame for one key at one coordinate. Blaming an absent key answers "which event deleted it", distinct from "never asserted" (`None`). `changepoints()` enumerates the valid axis of a snapshot: the distinct valid times at which its knowledge changes, so between two adjacent ones every read answers identically. It describes the knowledge state, not the view position, so scheduled changes are included.
-
-`db.bisect(predicate)` finds the first event where a predicate becomes true. The predicate must change once from false to true; a non-monotonic predicate has no meaningful boundary.
-
-## Connections
-
-A store is either writable or read-only, and its type determines what it can do:
-
-- `Database::memory()` opens a private in-memory database.
-- `Database::open(path)` opens a durable database. Every commit is a SQLite transaction, so it is on disk before `commit` returns and a crash can never leave a partial event. Concurrent connections are safe: the database runs in WAL mode, so SQLite serializes writers and a reader takes a consistent snapshot without blocking the writer.
-- `Reader::inspect(path)` opens a read-only database. Code that tries to write to it does not compile.
-
-`cargo run --example scrub -- path.db` opens a TUI scrubber over both axes: `h`/`l` walks the log, `[`/`]` hops between valid-time changepoints, `:`/`@` jump to a typed event number or date on either axis, `n`/`N` walk the selected key's own events, `/` filters keys, and `m` marks a baseline that every later position is diff-colored against.
-
-## Schema
-
-Two tables hold everything. An event is a moment of learning; a change is one assertion made at that moment:
-
-```sql
-CREATE TABLE events (
-    seq INTEGER PRIMARY KEY CHECK (seq > 0), -- event ID, assigned by SQLite
-    ts  INTEGER NOT NULL       -- transaction time
-) STRICT;
-
-CREATE TABLE changes (
-    key   TEXT NOT NULL,
-    valid INTEGER NOT NULL,    -- valid time of this assertion
-    seq   INTEGER NOT NULL REFERENCES events (seq),
-    kind  INTEGER NOT NULL,    -- bool, int, float, str, or delete
-    value ANY,                 -- stored natively; delete carries NULL
-    PRIMARY KEY (key, valid, seq)
-) STRICT, WITHOUT ROWID;
+```bash
+cargo test
 ```
 
-Timestamps are i64 microseconds since the epoch; finer input is truncated. A CHECK constraint ties `kind` to the stored type of `value`, so a mismatched row is unrepresentable for any writer, not just this library. Transaction timestamps are wall-clock readings under serialized writers: ordinarily nondecreasing, but a clock step can produce disorder and two events can share a microsecond, so `known_at` anchors on the latest timestamp at or before the target and breaks ties by `seq`. The `changes` table is the complete history; `SELECT * FROM changes WHERE key = ?` ordered however you like is the raw material of every other question.
+The integration tests cover transaction and valid-time reads, corrections, scheduled changes, value encoding, diffs, blame, changepoints, read-only connections, concurrent connections, schema views, and persistence.
 
-The views make the store fully usable from any SQLite client, no library needed:
+## Limitations
 
-- `latest` is the current state: `SELECT * FROM latest`.
-- `timeline` is each key's currently-believed history as half-open valid-time intervals; NULL `valid_to` is open-ended, and kind 4 marks an interval where the key is absent.
-- `scheduled` lists pending future changes, scheduled deletes included.
-- `corrections` lists assertions that rewrote the record, flagged `backdated` (valid time before its own commit) and `supersedes` (re-asserting an already-asserted valid time). Note that any write recording something that happened earlier counts as backdated; that is the honest definition, not an alarm.
-- `assertions` is the log made readable: type names instead of kind tags, ISO-8601 timestamps.
-- `keys` enumerates distinct keys with one index seek each.
-
-`latest` and `scheduled` read the live clock inside SQLite, so their answers move as time passes; the Rust `latest()` freezes its clock when the snapshot is taken, so a snapshot is repeatable. Each is the right behavior for its consumer.
-
-## Recipes
-
-The timeline as it was known through event T, for any SQLite client:
-
-```sql
-SELECT c.key, c.valid AS valid_from,
-       lead(c.valid) OVER (PARTITION BY c.key ORDER BY c.valid) AS valid_to,
-       c.kind, c.value
-FROM changes c
-WHERE c.seq <= :T
-  AND NOT EXISTS (SELECT 1 FROM changes k
-                   WHERE k.key = c.key AND k.valid = c.valid
-                     AND k.seq > c.seq AND k.seq <= :T);
-```
-
-Blame for one key at any coordinate (T as above, V in epoch microseconds):
-
-```sql
-SELECT c.seq, c.valid, c.kind, c.value, e.ts
-FROM changes c JOIN events e ON e.seq = c.seq
-WHERE c.key = :key AND c.valid <= :V AND c.seq <= :T
-ORDER BY c.valid DESC, c.seq DESC LIMIT 1;
-```
-
-A full bitemporal decomposition also exists: every assertion's region of authority in the (transaction, valid) plane, as half-open rectangles, derived entirely from the log. `tx` bounds are event IDs, and NULL bounds are open ends. It is deliberately not installed as a view: enumerating it costs quadratic time on keys with long plain-append histories, which measurement showed makes it wrong as a default read path. For offline analysis on modest data:
-
-```sql
-WITH bounds AS (
-    SELECT a.key, a.seq AS aseq, a.valid AS avalid, a.kind, a.value,
-           a.seq AS bseq,
-           (SELECT d.valid FROM changes d
-             WHERE d.key = a.key AND d.valid > a.valid AND d.seq <= a.seq
-             ORDER BY d.valid LIMIT 1) AS vto
-    FROM changes a
-    UNION ALL
-    SELECT a.key, a.seq, a.valid, a.kind, a.value, d.seq, d.valid
-    FROM changes d
-    JOIN changes a
-      ON a.key = d.key AND a.seq < d.seq
-     AND a.valid = (SELECT e.valid FROM changes e
-                     WHERE e.key = d.key AND e.valid < d.valid
-                       AND e.seq <= d.seq
-                     ORDER BY e.valid DESC LIMIT 1)
-    WHERE NOT EXISTS (SELECT 1 FROM changes p
-                       WHERE p.key = d.key AND p.valid = d.valid
-                         AND p.seq < d.seq)
-),
-epochs AS (
-    SELECT b.*,
-           lead(bseq) OVER (PARTITION BY key, aseq, avalid
-                            ORDER BY bseq) AS nseq,
-           (SELECT k.seq FROM changes k
-             WHERE k.key = b.key AND k.valid = b.avalid AND k.seq > b.aseq
-             ORDER BY k.seq LIMIT 1) AS kseq
-    FROM bounds b
-)
-SELECT key, kind, value,
-       bseq AS tx_from,
-       CASE WHEN kseq IS NOT NULL AND (nseq IS NULL OR kseq < nseq)
-            THEN kseq ELSE nseq END AS tx_to,
-       avalid AS valid_from,
-       vto AS valid_to
-FROM epochs
-WHERE kseq IS NULL OR bseq < kseq;
-```
+- The value model has no byte strings, collections, or application-defined types.
+- Timestamp precision is limited to microseconds.
+- Transaction timestamps come from the system clock and may tie or move backward. Event IDs define commit order; `known_at` breaks equal timestamps by event ID.
+- `bisect` requires a predicate that changes at most once from false to true.
+- Append-only behavior is enforced by the Rust API. A SQLite client with write access can modify the base tables directly.
 
 ## License
 

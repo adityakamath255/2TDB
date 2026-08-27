@@ -10,7 +10,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph, Row, Table, TableState};
 use ratatui::{DefaultTerminal, Frame};
 
-use time_travel_db_rs::{
+use two_tdb::{
     Assertion, Delta, Error, EventId, Reader, RecordedAssertion, Snapshot, State, Timestamp, Value,
 };
 

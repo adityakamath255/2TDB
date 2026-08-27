@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use time_travel_db_rs::{
+use two_tdb::{
     Assertion, Batch, Database, Delta, Error, Reader, RecordedAssertion, Timestamp, Value, Write,
 };
 
@@ -23,7 +23,7 @@ static COUNTER: AtomicU64 = AtomicU64::new(0);
 fn temp_path() -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let mut path = std::env::temp_dir();
-    path.push(format!("ttdb-{}-{}.db", std::process::id(), n));
+    path.push(format!("2tdb-{}-{}.db", std::process::id(), n));
     path
 }
 

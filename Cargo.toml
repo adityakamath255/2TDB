@@ -1,5 +1,5 @@
 [package]
-name = "time-travel-db-rs"
+name = "two-tdb"
 version = "0.1.0"
 edition = "2024"
 description = "An append-only, bitemporal key-value store: an event log in SQLite, with cheap snapshots at any point in transaction and valid time."
