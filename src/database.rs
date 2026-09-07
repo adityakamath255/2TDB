@@ -50,6 +50,8 @@ impl From<&str> for Value {
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("cannot commit an empty collection of writes")]
+    EmptyCommit,
     #[error("no event {id}: the log holds {len} events")]
     OutOfRange { id: EventId, len: u64 },
     #[error("unreadable row in the log")]
@@ -131,52 +133,35 @@ impl Write {
     }
 }
 
-// the 1st field is so that empty batches can't be represented
-pub struct Batch {
-    first: Write,
-    rest: Vec<Write>,
-}
-
 pub(crate) struct ResolvedWrite {
     pub(crate) key: String,
     pub(crate) valid_from: i64,
     pub(crate) value: Option<Value>,
 }
 
-impl Batch {
-    pub fn new(first: Write) -> Self {
-        Batch {
-            first,
-            rest: Vec::new(),
-        }
-    }
+pub(crate) fn resolve_writes(
+    writes: Vec<Write>,
+    committed_at: Timestamp,
+) -> impl Iterator<Item = ResolvedWrite> {
+    let commit_micros = committed_at.as_microsecond();
+    let unique: BTreeMap<_, _> = writes
+        .into_iter()
+        .map(|write| {
+            let valid_from = match write.valid_from {
+                ValidFrom::Commit => commit_micros,
+                ValidFrom::At(valid_from) => valid_from.as_microsecond(),
+            };
+            ((write.key, valid_from), write.value)
+        })
+        .collect();
 
-    pub fn and(mut self, write: Write) -> Self {
-        self.rest.push(write);
-        self
-    }
-
-    pub(crate) fn resolve(self, committed_at: Timestamp) -> impl Iterator<Item = ResolvedWrite> {
-        let commit_micros = committed_at.as_microsecond();
-        let unique: BTreeMap<_, _> = std::iter::once(self.first)
-            .chain(self.rest)
-            .map(|write| {
-                let valid_from = match write.valid_from {
-                    ValidFrom::Commit => commit_micros,
-                    ValidFrom::At(valid_from) => valid_from.as_microsecond(),
-                };
-                ((write.key, valid_from), write.value)
-            })
-            .collect();
-
-        unique
-            .into_iter()
-            .map(|((key, valid_from), value)| ResolvedWrite {
-                key,
-                valid_from,
-                value,
-            })
-    }
+    unique
+        .into_iter()
+        .map(|((key, valid_from), value)| ResolvedWrite {
+            key,
+            valid_from,
+            value,
+        })
 }
 
 pub struct ReadOnly;
@@ -205,8 +190,30 @@ impl Handle<ReadWrite> {
         Ok(Handle::new(Sqlite::memory()?))
     }
 
-    pub fn commit(&mut self, batch: Batch) -> Result<EventId, Error> {
-        self.sqlite.commit(batch)
+    /// Records writes as one atomic event, returning its ID.
+    ///
+    /// Accepts arrays, vectors, or iterators of [`Write`]. The input is collected
+    /// before acquiring the database's write lock. Empty input returns
+    /// [`Error::EmptyCommit`] without starting a transaction.
+    ///
+    /// Writes without an explicit valid time use the event's commit timestamp.
+    /// For repeated keys at the same valid time, after truncation to
+    /// microseconds, the last supplied write wins.
+    ///
+    /// ```
+    /// use two_tdb::{Database, Write};
+    ///
+    /// let mut db = Database::memory()?;
+    /// let event = db.commit([
+    ///     Write::set("name", "Ada"),
+    ///     Write::set("active", true),
+    ///     Write::delete("pending"),
+    /// ])?;
+    /// assert_eq!(db.event(event)?.assertions.len(), 3);
+    /// # Ok::<(), two_tdb::Error>(())
+    /// ```
+    pub fn commit(&mut self, writes: impl IntoIterator<Item = Write>) -> Result<EventId, Error> {
+        self.sqlite.commit(writes.into_iter().collect())
     }
 }
 

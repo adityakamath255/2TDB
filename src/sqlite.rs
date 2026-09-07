@@ -5,8 +5,8 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
 
 use crate::Timestamp;
 use crate::database::{
-    Assertion, Batch, Coordinate, Error, Event, EventId, RecordedAssertion, State,
-    TransactionCutoff, Value,
+    Assertion, Coordinate, Error, Event, EventId, RecordedAssertion, State, TransactionCutoff,
+    Value, Write, resolve_writes,
 };
 
 const SCHEMA: &str = include_str!("schema.sql");
@@ -125,7 +125,10 @@ impl Sqlite {
         rows.map(|row| row?.decode()).collect()
     }
 
-    pub(crate) fn commit(&mut self, batch: Batch) -> Result<EventId, Error> {
+    pub(crate) fn commit(&mut self, writes: Vec<Write>) -> Result<EventId, Error> {
+        if writes.is_empty() {
+            return Err(Error::EmptyCommit);
+        }
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -135,7 +138,7 @@ impl Sqlite {
             [committed_at.as_microsecond()],
             |row| row.get(0),
         )?;
-        let assertions = batch.resolve(committed_at);
+        let assertions = resolve_writes(writes, committed_at);
         {
             let mut statement = transaction.prepare(
                 "INSERT INTO changes (seq, key, valid, kind, value)

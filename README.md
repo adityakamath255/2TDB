@@ -7,13 +7,13 @@ The project began as a Rust rewrite of a smaller Python implementation.
 ## Usage
 
 ```rust
-use two_tdb::{Batch, Database, Value, Write};
+use two_tdb::{Database, Value, Write};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut db = Database::memory()?;
 
-    let first = db.commit(Batch::new(Write::set("votes", 1)))?;
-    db.commit(Batch::new(Write::set("votes", 2)))?;
+    let first = db.commit([Write::set("votes", 1)])?;
+    db.commit([Write::set("votes", 2)])?;
 
     assert_eq!(db.at(first)?.get("votes")?, Some(Value::Int(1)));
     assert_eq!(db.latest()?.get("votes")?, Some(Value::Int(2)));
@@ -22,9 +22,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-`Database::memory()` creates an in-memory store. `Database::open(path)` creates or opens a file-backed store. A commit takes a non-empty `Batch` and records its assertions in one SQLite transaction.
+`Database::memory()` creates an in-memory store. `Database::open(path)` creates or opens a file-backed store. A commit accepts an array, vector, or iterator of `Write` values and records its assertions as one event in one SQLite transaction.
+
+```rust
+db.commit([
+    Write::set("name", "Ada"),
+    Write::set("active", true),
+    Write::delete("pending"),
+])?;
+
+let writes = ["alice", "bob"].into_iter().map(|name| {
+    Write::set(format!("users/{name}/active"), true)
+});
+db.commit(writes)?;
+```
+
+The input is collected before acquiring the database's write lock. Empty input returns `Error::EmptyCommit` without starting a transaction or creating an event. For conditional writes, assemble a vector and skip the commit if it is empty.
 
 `Write::set` and `Write::delete` use the commit timestamp as their valid time. `Write::set_at` and `Write::delete_at` accept a caller-supplied valid time for corrections and scheduled changes.
+
+Within one commit, the last supplied write wins for each key and valid timestamp, after truncating timestamps to microseconds. Writes for the same key at different valid times are retained.
 
 ## Time model
 
@@ -49,7 +66,7 @@ This rule preserves later valid-time assertions when a correction is recorded. I
 
 The public API separates writes, snapshots, and log inspection:
 
-- `Batch` groups assertions into one atomic event. Its required first `Write` makes an empty batch unrepresentable.
+- `commit` groups a collection of writes into one atomic event and returns its event ID.
 - `Database` can commit and read. `Reader::inspect(path)` opens the same store read-only; its type has no `commit` method.
 - `Snapshot::get` reads one key. `state` returns all values at the coordinate, and `diff` compares two coordinates.
 - `blame` returns the assertion selected for a key, including the deleting assertion when a key is absent. It returns `None` when the key was never asserted.
