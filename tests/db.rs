@@ -322,6 +322,38 @@ fn a_snapshot_reports_its_coordinates() {
 }
 
 #[test]
+fn held_snapshots_stay_fixed_across_connections() {
+    let path = temp_path();
+    let mut writer = Database::open(&path).unwrap();
+    let valid = ts("2020-01-01T00:00:00Z");
+    let first = writer.commit([Write::set_at("x", 1, valid)]).unwrap();
+    let reader = Reader::inspect(&path).unwrap();
+    let held = reader.latest().unwrap();
+    assert_eq!(held.get("x").unwrap(), Some(Value::Int(1)));
+
+    // backdating makes the correction eligible at the held snapshot's valid time.
+    let second = writer.commit([Write::set_at("x", 2, valid)]).unwrap();
+    let fresh = reader.latest().unwrap();
+
+    assert_eq!(held.event_id(), Some(first));
+    assert_eq!(held.get("x").unwrap(), Some(Value::Int(1)));
+    assert_eq!(
+        held.state().unwrap(),
+        BTreeMap::from([("x".into(), Value::Int(1))])
+    );
+    assert_eq!(fresh.event_id(), Some(second));
+    assert_eq!(fresh.get("x").unwrap(), Some(Value::Int(2)));
+    assert_eq!(
+        fresh.state().unwrap(),
+        BTreeMap::from([("x".into(), Value::Int(2))])
+    );
+
+    reader.close().unwrap();
+    writer.close().unwrap();
+    std::fs::remove_file(&path).unwrap();
+}
+
+#[test]
 fn keys_enumerate_every_key_ever_asserted() {
     let mut db = Database::memory().unwrap();
     assert!(db.keys().unwrap().is_empty());
