@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
@@ -83,7 +84,7 @@ class Reader:
     """Read access to one tenant's history.
 
     The connection must be in autocommit mode; each call runs in its own
-    read-only transaction. embed turns text into vectors for search, and must
+    read-only transaction, and calls from several threads take turns. embed turns text into vectors for search, and must
     be the model that embedded the stored facts.
     """
 
@@ -93,10 +94,12 @@ class Reader:
         self._connection = connection
         self.tenant = tenant
         self._embed = embed
+        # a connection runs one transaction at a time
+        self._lock = threading.RLock()
 
     @contextmanager
     def _transaction(self, *, read_only: bool = True) -> Iterator[psycopg.Connection]:
-        with self._connection.transaction():
+        with self._lock, self._connection.transaction():
             if read_only:
                 self._connection.execute("SET TRANSACTION READ ONLY")
             self._connection.execute(t"SELECT set_config('app.tenant', {str(self.tenant)}, true)")

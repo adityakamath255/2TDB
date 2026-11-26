@@ -425,3 +425,22 @@ def test_the_embedding_model_fits_the_schema(new_tenant, connect_app):
     commit(store, Write.set("city", "Pune"), Write.set("pet", "a beagle named Bruno"), Write.delete("plan"))
 
     assert list(store.latest().search("where does she live")) == ["city", "pet"]
+
+
+def test_threads_can_share_a_store(store):
+    commit(store, Write.set("x", 1))
+    failures = []
+
+    def read() -> None:
+        try:
+            for _ in range(20):
+                assert store.latest().get("x") == 1
+        except Exception as error:
+            failures.append(error)
+
+    threads = [threading.Thread(target=read) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert failures == []
