@@ -35,7 +35,8 @@ CREATE TYPE value_kind AS ENUM ('bool', 'int', 'float', 'str', 'delete');
 
 CREATE TABLE changes (
     tenant      bigint NOT NULL DEFAULT current_tenant(),
-    key         text NOT NULL CHECK (key <> ''),
+    -- byte order, so key order in SQL matches Python's string order
+    key         text COLLATE "C" NOT NULL CHECK (key <> ''),
     valid       timestamptz NOT NULL CHECK (isfinite(valid)),
     seq         bigint NOT NULL,
     kind        value_kind NOT NULL,

@@ -113,6 +113,14 @@ def test_state_lists_the_values_at_a_coordinate(store):
     assert list(store.at(1).state().items()) == [("a", 1), ("b", 2)]
 
 
+def test_keys_sort_as_python_sorts_strings(store):
+    keys = ["b", "B", "a-c", "ab", "é", "A"]
+    commit(store, *(Write.set(key, 0) for key in keys))
+
+    assert store.keys() == sorted(keys)
+    assert list(store.latest().state()) == sorted(keys)
+
+
 def test_diff_spans_both_axes(store, new_store):
     commit(store, Write.set("keep", 1), Write.set("change", 2), Write.set("drop", 3))
     commit(store, Write.set("change", 20), Write.delete("drop"), Write.set("add", 4))
