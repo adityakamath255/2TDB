@@ -85,6 +85,11 @@ def store(new_store) -> Store:
 
 
 @pytest.fixture
+def open_store(connect_app) -> Callable[[int], Store]:
+    return lambda tenant: Store(connect_app(), tenant, embed)
+
+
+@pytest.fixture
 def open_reader(connect_app) -> Callable[[int], Reader]:
     return lambda tenant: Reader(connect_app(), tenant, embed)
 

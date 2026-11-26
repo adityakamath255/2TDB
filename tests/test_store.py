@@ -5,7 +5,6 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 
-from conftest import embed
 from two_tdb import (
     Added,
     Assertion,
@@ -367,8 +366,8 @@ def test_the_database_rejects_values_that_contradict_their_kind(store, owner):
         )
 
 
-def test_concurrent_commits_number_events_in_commit_order(store, connect_app):
-    writers = [Store(connect_app(), store.tenant, embed) for _ in range(4)]
+def test_concurrent_commits_number_events_in_commit_order(store, open_store):
+    writers = [open_store(store.tenant) for _ in range(4)]
     errors = []
 
     def write(writer: Store) -> None:

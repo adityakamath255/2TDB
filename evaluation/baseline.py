@@ -23,7 +23,7 @@ when the messages don't contain the answer.
 
 
 def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
-    return sum(x * y for x, y in zip(a, b)) / (math.hypot(*a) * math.hypot(*b))
+    return sum(x * y for x, y in zip(a, b, strict=True)) / (math.hypot(*a) * math.hypot(*b))
 
 
 class Notes:

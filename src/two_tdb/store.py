@@ -232,7 +232,8 @@ class Store(Reader):
             keys, valids, kinds, bools, ints, floats, strs, vectors = (
                 list(column)
                 for column in zip(
-                    *((key, valid, *_encode(value), vector) for (key, valid), (value, vector) in latest.items())
+                    *((key, valid, *_encode(value), vector) for (key, valid), (value, vector) in latest.items()),
+                    strict=True,
                 )
             )
             db.execute(t"""
