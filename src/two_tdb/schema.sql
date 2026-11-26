@@ -61,3 +61,33 @@ CREATE POLICY own_tenant ON events USING (tenant = current_tenant());
 CREATE POLICY own_tenant ON changes USING (tenant = current_tenant());
 
 GRANT SELECT, INSERT ON events, changes TO two_tdb_app;
+
+-- API keys are stored as SHA-256 hashes; a key is shown once, by
+-- create_api_key. the app can only resolve a key, through api_key_tenant.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE api_keys (
+    id       bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tenant   bigint NOT NULL REFERENCES tenants,
+    writable boolean NOT NULL,
+    hash     bytea NOT NULL UNIQUE
+);
+
+CREATE FUNCTION create_api_key(tenant bigint, writable boolean) RETURNS text
+LANGUAGE plpgsql AS $$
+DECLARE
+    key text := '2tdb_' || encode(gen_random_bytes(32), 'hex');
+BEGIN
+    INSERT INTO api_keys (tenant, writable, hash) VALUES (tenant, writable, sha256(convert_to(key, 'UTF8')));
+    RETURN key;
+END
+$$;
+
+REVOKE EXECUTE ON FUNCTION create_api_key FROM PUBLIC;
+
+CREATE FUNCTION api_key_tenant(key text, OUT tenant bigint, OUT writable boolean)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+RETURN (SELECT (k.tenant, k.writable) FROM api_keys k WHERE k.hash = sha256(convert_to(key, 'UTF8')));
+
+REVOKE EXECUTE ON FUNCTION api_key_tenant FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION api_key_tenant TO two_tdb_app;

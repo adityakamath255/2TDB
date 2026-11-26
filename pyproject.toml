@@ -6,7 +6,10 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
 dependencies = [
+    "fastapi>=0.165.0",
+    "psycopg-pool>=3.3.3",
     "psycopg[binary]>=3.3.9",
+    "uvicorn>=0.54.0",
 ]
 
 [build-system]
@@ -15,6 +18,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.16.2",
     "pytest>=9.2.0",
 ]
 

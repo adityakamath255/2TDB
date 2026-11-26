@@ -4,13 +4,17 @@ from collections.abc import Callable, Iterator
 
 import psycopg
 import pytest
+from fastapi.testclient import TestClient
 from psycopg import sql
 
 from two_tdb import Reader, Store, install
+from two_tdb.api import create_app
 
 # a Postgres server whose user may create databases, such as `docker compose up db`
 SERVER = os.environ.get("TWO_TDB_TEST_SERVER", "postgresql://postgres:postgres@localhost:5432")
 DATABASE = "two_tdb_test"
+# the role is shared by every database on the server; compose.yaml uses the same default
+APP_PASSWORD = os.environ.get("TWO_TDB_APP_PASSWORD", "two_tdb_app")
 
 
 @pytest.fixture(scope="session")
@@ -70,3 +74,23 @@ def store(new_store) -> Store:
 @pytest.fixture
 def open_reader(connect_app) -> Callable[[int], Reader]:
     return lambda tenant: Reader(connect_app(), tenant)
+
+
+@pytest.fixture(scope="session")
+def app(database: str) -> Iterator[TestClient]:
+    with psycopg.connect(database, autocommit=True) as owner:
+        owner.execute(sql.SQL("ALTER ROLE two_tdb_app LOGIN PASSWORD {}").format(APP_PASSWORD))
+    host = SERVER.split("@", 1)[1]
+    with TestClient(create_app(f"postgresql://two_tdb_app:{APP_PASSWORD}@{host}/{DATABASE}")) as client:
+        yield client
+
+
+@pytest.fixture
+def new_key(owner: psycopg.Connection, new_tenant: Callable[[], int]) -> Callable[..., str]:
+    """Returns an API key for tenant, a fresh one by default."""
+
+    def create(tenant: int | None = None, *, writable: bool = True) -> str:
+        tenant = new_tenant() if tenant is None else tenant
+        return owner.execute("SELECT create_api_key(%s, %s)", [tenant, writable]).fetchone()[0]
+
+    return create
