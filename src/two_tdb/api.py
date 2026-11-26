@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg_pool import ConnectionPool, PoolTimeout
-from pydantic import AwareDatetime, BaseModel, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from two_tdb.model import (
     Added,
@@ -24,7 +24,8 @@ from two_tdb.model import (
     Value,
     Write,
 )
-from two_tdb.store import Reader, Snapshot, Store
+from two_tdb.embedding import Embedder
+from two_tdb.store import Embed, Reader, Snapshot, Store
 
 
 class At(BaseModel, extra="forbid"):
@@ -53,6 +54,11 @@ class At(BaseModel, extra="forbid"):
 
 class KeyAt(At):
     key: str
+
+
+class SearchAt(At):
+    q: str
+    limit: Annotated[int, Field(ge=1, le=50)] = 5
 
 
 class KeyQuery(BaseModel, extra="forbid"):
@@ -121,6 +127,18 @@ class StateOut:
 
 
 @dataclass(frozen=True)
+class Fact:
+    key: str
+    value: Value
+
+
+@dataclass(frozen=True)
+class SearchOut:
+    snapshot: SnapshotOut
+    matches: list[Fact]
+
+
+@dataclass(frozen=True)
 class ChangepointsOut:
     snapshot: SnapshotOut
     changepoints: list[datetime]
@@ -160,13 +178,14 @@ _bearer = HTTPBearer(description="An API key from create_api_key.")
 
 def _reader(request: Request, credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)]) -> Iterator[Reader]:
     pool: ConnectionPool = request.app.state.pool
+    embed: Embed = request.app.state.embed
     with pool.connection() as connection:
         tenant, writable = connection.execute(
             "SELECT tenant, writable FROM api_key_tenant(%s)", [credentials.credentials]
         ).fetchone()
         if tenant is None:
             raise HTTPException(401, "unknown API key", headers={"WWW-Authenticate": "Bearer"})
-        yield Store(connection, tenant) if writable else Reader(connection, tenant)
+        yield (Store if writable else Reader)(connection, tenant, embed)
 
 
 def _store(reader: Annotated[Reader, Depends(_reader)]) -> Store:
@@ -178,7 +197,7 @@ def _store(reader: Annotated[Reader, Depends(_reader)]) -> Store:
 type ReaderDep = Annotated[Reader, Depends(_reader)]
 
 
-def create_app(conninfo: str) -> FastAPI:
+def create_app(conninfo: str, embed: Embed) -> FastAPI:
     """Returns the HTTP API over the database at conninfo, which must log in as two_tdb_app."""
 
     @asynccontextmanager
@@ -186,6 +205,7 @@ def create_app(conninfo: str) -> FastAPI:
         with ConnectionPool(conninfo, kwargs={"autocommit": True}, open=False) as pool:
             pool.open(wait=True)
             app.state.pool = pool
+            app.state.embed = embed
             yield
 
     app = FastAPI(title="2TDB", summary="A bitemporal key-value store.", lifespan=lifespan)
@@ -229,6 +249,13 @@ def create_app(conninfo: str) -> FastAPI:
         snapshot = query.snapshot(reader)
         return StateOut(SnapshotOut.of(snapshot), snapshot.state())
 
+    @app.get("/search")
+    def search(query: Annotated[SearchAt, Query()], reader: ReaderDep) -> SearchOut:
+        """Returns the facts held at the snapshot that are closest in meaning to q, closest first."""
+        snapshot = query.snapshot(reader)
+        matches = [Fact(key, value) for key, value in snapshot.search(query.q, query.limit).items()]
+        return SearchOut(SnapshotOut.of(snapshot), matches)
+
     @app.get("/changepoints")
     def changepoints(query: Annotated[At, Query()], reader: ReaderDep) -> ChangepointsOut:
         snapshot = query.snapshot(reader)
@@ -254,4 +281,4 @@ def create_app(conninfo: str) -> FastAPI:
 
 def from_environment() -> FastAPI:
     """The app for `uvicorn --factory`, connecting to TWO_TDB_DATABASE_URL."""
-    return create_app(os.environ["TWO_TDB_DATABASE_URL"])
+    return create_app(os.environ["TWO_TDB_DATABASE_URL"], Embedder())

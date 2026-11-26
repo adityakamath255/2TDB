@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import datetime
 from importlib.resources import files
+from string.templatelib import Template
 
 import psycopg
 
@@ -13,6 +14,7 @@ from two_tdb.model import (
     Delta,
     EmptyCommit,
     Event,
+    InvalidInput,
     OutOfRange,
     RecordedAssertion,
     Removed,
@@ -23,6 +25,8 @@ from two_tdb.model import (
 )
 
 _KINDS = ("bool", "int", "float", "str")
+
+type Embed = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
 # every key once, ascending, with one index probe per key; SELECT DISTINCT reads
 # every assertion and measured 4.5x slower at 1,000 keys of 200 assertions each
@@ -55,6 +59,14 @@ def _encode(value: Value | None) -> tuple[str, bool | None, int | None, float | 
             return ("str", None, None, None, value)
 
 
+def _text(key: str, value: Value) -> str:
+    return f"{key}: {value}"
+
+
+def _vector(vector: Sequence[float]) -> str:
+    return "[" + ",".join(map(str, vector)) + "]"
+
+
 # expects columns: kind, bool_value, int_value, float_value, str_value
 def _decode(columns: Sequence) -> Value | None:
     kind, *values = columns
@@ -71,14 +83,16 @@ class Reader:
     """Read access to one tenant's history.
 
     The connection must be in autocommit mode; each call runs in its own
-    read-only transaction.
+    read-only transaction. embed turns text into vectors for search, and must
+    be the model that embedded the stored facts.
     """
 
-    def __init__(self, connection: psycopg.Connection, tenant: int) -> None:
+    def __init__(self, connection: psycopg.Connection, tenant: int, embed: Embed) -> None:
         if not connection.autocommit:
             raise ValueError("the connection must be in autocommit mode")
         self._connection = connection
         self.tenant = tenant
+        self._embed = embed
 
     @contextmanager
     def _transaction(self, *, read_only: bool = True) -> Iterator[psycopg.Connection]:
@@ -196,6 +210,8 @@ class Store(Reader):
         if not writes:
             raise EmptyCommit()
         check_source(source)
+        vectors = iter(self._embed([_text(w.key, w.value) for w in writes if w.value is not None]))
+        embedded = [(write, None if write.value is None else _vector(next(vectors))) for write in writes]
         with self._transaction(read_only=False) as db:
             db.execute(t"SELECT pg_advisory_xact_lock({self.tenant}::bigint)")
             event_id, committed_at = db.execute(t"""
@@ -207,19 +223,23 @@ class Store(Reader):
                 RETURNING seq, committed_at
             """).fetchone()
             latest = {
-                (write.key, committed_at if write.valid_from is None else write.valid_from): write.value
-                for write in writes
+                (write.key, committed_at if write.valid_from is None else write.valid_from): (write.value, vector)
+                for write, vector in embedded
             }
-            keys, valids, kinds, bools, ints, floats, strs = (
+            keys, valids, kinds, bools, ints, floats, strs, vectors = (
                 list(column)
-                for column in zip(*((key, valid, *_encode(value)) for (key, valid), value in latest.items()))
+                for column in zip(
+                    *((key, valid, *_encode(value), vector) for (key, valid), (value, vector) in latest.items())
+                )
             )
             db.execute(t"""
                 INSERT INTO changes
-                    (seq, key, valid, kind, bool_value, int_value, float_value, str_value)
-                SELECT {event_id}, * FROM unnest(
+                    (seq, key, valid, kind, bool_value, int_value, float_value, str_value, embedding)
+                SELECT {event_id}, k, v, kind, b, i, f, s, e::vector FROM unnest(
                     {keys}::text[], {valids}::timestamptz[], {kinds}::value_kind[],
-                    {bools}::boolean[], {ints}::bigint[], {floats}::float8[], {strs}::text[])
+                    {bools}::boolean[], {ints}::bigint[], {floats}::float8[], {strs}::text[],
+                    {vectors}::text[]
+                ) AS u (k, v, kind, b, i, f, s, e)
             """)
         return event_id
 
@@ -271,23 +291,46 @@ class Snapshot:
             """).fetchone()
         return None if row is None else _recorded(row)
 
+    def _winners(self) -> Template:
+        """The assertion deciding each key here, deletions included."""
+        return t"""
+            {_KEYS:q}
+            SELECT w.key, w.kind, w.bool_value, w.int_value, w.float_value, w.str_value, w.embedding
+            FROM keys CROSS JOIN LATERAL (
+                SELECT * FROM changes
+                WHERE key = keys.key
+                  AND valid <= coalesce({self.valid_through}::timestamptz, 'infinity')
+                  AND seq <= coalesce({self.event_id}::bigint, 0)
+                ORDER BY valid DESC, seq DESC
+                LIMIT 1
+            ) AS w
+        """
+
     def state(self) -> dict[str, Value]:
         """Returns every key that has a value here, in ascending key order."""
         with self.reader._transaction() as db:
             rows = db.execute(t"""
-                {_KEYS:q}
-                SELECT keys.key, w.kind, w.bool_value, w.int_value, w.float_value, w.str_value
-                FROM keys CROSS JOIN LATERAL (
-                    SELECT * FROM changes
-                    WHERE key = keys.key
-                      AND valid <= coalesce({self.valid_through}::timestamptz, 'infinity')
-                      AND seq <= coalesce({self.event_id}::bigint, 0)
-                    ORDER BY valid DESC, seq DESC
-                    LIMIT 1
-                ) AS w
-                ORDER BY keys.key
+                SELECT key, kind, bool_value, int_value, float_value, str_value
+                FROM ({self._winners():q}) AS w
+                WHERE kind <> 'delete'
+                ORDER BY key
             """).fetchall()
-        return {key: value for key, *columns in rows if (value := _decode(columns)) is not None}
+        return {key: _decode(columns) for key, *columns in rows}
+
+    def search(self, text: str, limit: int = 5) -> dict[str, Value]:
+        """Returns up to limit of the values held here, closest in meaning to text first."""
+        if limit < 1:
+            raise InvalidInput(f"limit must be positive, got {limit}")
+        (query,) = self.reader._embed([text])
+        with self.reader._transaction() as db:
+            rows = db.execute(t"""
+                SELECT key, kind, bool_value, int_value, float_value, str_value
+                FROM ({self._winners():q}) AS w
+                WHERE kind <> 'delete'
+                ORDER BY embedding <=> {_vector(query)}::vector, key
+                LIMIT {limit}
+            """).fetchall()
+        return {key: _decode(columns) for key, *columns in rows}
 
     def changepoints(self) -> list[datetime]:
         """Returns every valid time at which some key changes, as of event_id."""

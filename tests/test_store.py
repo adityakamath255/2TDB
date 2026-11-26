@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 
+from conftest import embed
 from two_tdb import (
     Added,
     Assertion,
@@ -367,7 +368,7 @@ def test_the_database_rejects_values_that_contradict_their_kind(store, owner):
 
 
 def test_concurrent_commits_number_events_in_commit_order(store, connect_app):
-    writers = [Store(connect_app(), store.tenant) for _ in range(4)]
+    writers = [Store(connect_app(), store.tenant, embed) for _ in range(4)]
     errors = []
 
     def write(writer: Store) -> None:
@@ -401,3 +402,26 @@ def test_commit_times_never_go_backwards(store, owner):
 
     assert store.event(2).committed_at >= ahead
     assert store.latest().get("x") == 1
+
+
+def test_search_ranks_only_the_facts_held_at_the_snapshot(store):
+    commit(store, Write.set("city", "Mumbai", ts("2026-01-01T00:00:00Z")), Write.set("pet", "a beagle"))
+    commit(store, Write.set("city", "Pune", ts("2026-10-01T00:00:00Z")), Write.set("plan", "pro"))
+    commit(store, Write.delete("pet"))
+
+    now = store.latest()
+    assert list(now.search("city Mumbai")) == ["city", "plan"]
+    assert now.search("city Mumbai", limit=1) == {"city": "Pune"}
+    assert now.valid_at(ts("2026-06-01T00:00:00Z")).search("city", limit=1) == {"city": "Mumbai"}
+    assert store.at(1).search("beagle", limit=1) == {"pet": "a beagle"}
+    with pytest.raises(InvalidInput):
+        now.search("city", limit=0)
+
+
+def test_the_embedding_model_fits_the_schema(new_tenant, connect_app):
+    from two_tdb.embedding import Embedder
+
+    store = Store(connect_app(), new_tenant(), Embedder())
+    commit(store, Write.set("city", "Pune"), Write.set("pet", "a beagle named Bruno"), Write.delete("plan"))
+
+    assert list(store.latest().search("where does she live")) == ["city", "pet"]

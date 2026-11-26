@@ -31,6 +31,8 @@ CREATE TABLE events (
 
 CREATE INDEX events_by_time ON events (tenant, committed_at);
 
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TYPE value_kind AS ENUM ('bool', 'int', 'float', 'str', 'delete');
 
 CREATE TABLE changes (
@@ -45,6 +47,8 @@ CREATE TABLE changes (
     float_value double precision
         CHECK (float_value NOT IN ('NaN', 'Infinity', '-Infinity')),
     str_value   text,
+    -- the "key: value" text embedded by two_tdb.embedding.MODEL; none for a deletion
+    embedding   vector(384) CHECK ((kind = 'delete') = (embedding IS NULL)),
     PRIMARY KEY (tenant, key, valid, seq),
     FOREIGN KEY (tenant, seq) REFERENCES events,
     CHECK ((kind = 'bool') = (bool_value IS NOT NULL)

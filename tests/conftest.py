@@ -1,5 +1,7 @@
 import os
+import re
 import uuid
+import zlib
 from collections.abc import Callable, Iterator
 
 import psycopg
@@ -15,6 +17,17 @@ SERVER = os.environ.get("TWO_TDB_TEST_SERVER", "postgresql://postgres:postgres@l
 DATABASE = "two_tdb_test"
 # the role is shared by every database on the server; compose.yaml uses the same default
 APP_PASSWORD = os.environ.get("TWO_TDB_APP_PASSWORD", "two_tdb_app")
+
+
+def embed(texts: list[str]) -> list[list[float]]:
+    """A stand-in for the model: texts sharing words are close."""
+    vectors = []
+    for text in texts:
+        vector = [0.0] * 383 + [0.1]
+        for word in re.findall(r"\w+", text.lower()):
+            vector[zlib.crc32(word.encode()) % 383] += 1
+        vectors.append(vector)
+    return vectors
 
 
 @pytest.fixture(scope="session")
@@ -63,7 +76,7 @@ def new_tenant(owner: psycopg.Connection) -> Callable[[], int]:
 @pytest.fixture
 def new_store(new_tenant: Callable[[], int], connect_app) -> Callable[[], Store]:
     """Returns a Store for a fresh tenant on its own connection, so each starts empty."""
-    return lambda: Store(connect_app(), new_tenant())
+    return lambda: Store(connect_app(), new_tenant(), embed)
 
 
 @pytest.fixture
@@ -73,7 +86,7 @@ def store(new_store) -> Store:
 
 @pytest.fixture
 def open_reader(connect_app) -> Callable[[int], Reader]:
-    return lambda tenant: Reader(connect_app(), tenant)
+    return lambda tenant: Reader(connect_app(), tenant, embed)
 
 
 @pytest.fixture(scope="session")
@@ -81,7 +94,7 @@ def app(database: str) -> Iterator[TestClient]:
     with psycopg.connect(database, autocommit=True) as owner:
         owner.execute(sql.SQL("ALTER ROLE two_tdb_app LOGIN PASSWORD {}").format(APP_PASSWORD))
     host = SERVER.split("@", 1)[1]
-    with TestClient(create_app(f"postgresql://two_tdb_app:{APP_PASSWORD}@{host}/{DATABASE}")) as client:
+    with TestClient(create_app(f"postgresql://two_tdb_app:{APP_PASSWORD}@{host}/{DATABASE}", embed)) as client:
         yield client
 
 

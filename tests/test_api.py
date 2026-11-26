@@ -108,3 +108,12 @@ def test_history_blame_and_diff_explain_a_change(app, new_key):
 def test_the_app_cannot_read_api_keys(connect_app):
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         connect_app().execute("SELECT * FROM api_keys")
+
+
+def test_search_returns_facts_closest_first(app, new_key):
+    key = new_key()
+    commit(app, key, {"key": "city", "value": "Pune"}, {"key": "pet", "value": "a beagle"})
+
+    found = app.get("/search", params={"q": "beagle", "limit": 1}, headers=auth(key)).json()
+    assert found["matches"] == [{"key": "pet", "value": "a beagle"}]
+    assert app.get("/search", params={"q": "x", "limit": 0}, headers=auth(key)).status_code == 422
