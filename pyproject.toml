@@ -1,0 +1,22 @@
+[project]
+name = "two-tdb"
+version = "0.1.0"
+description = "A bitemporal key-value store on Postgres, served over HTTP to programs and LLM agents."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.14"
+dependencies = [
+    "psycopg[binary]>=3.3.9",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
