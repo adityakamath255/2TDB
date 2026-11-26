@@ -21,10 +21,12 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "anthropic>=2.14.0",
     "httpx2>=2.16.2",
     "pytest>=9.2.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 filterwarnings = ["ignore:.asyncio.iscoroutinefunction. is deprecated:DeprecationWarning:langsmith"]

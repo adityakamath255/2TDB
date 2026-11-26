@@ -1312,6 +1312,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "anthropic" },
     { name = "httpx2" },
     { name = "pytest" },
 ]
@@ -1329,6 +1330,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anthropic", specifier = ">=2.14.0" },
     { name = "httpx2", specifier = ">=2.16.2" },
     { name = "pytest", specifier = ">=9.2.0" },
 ]
