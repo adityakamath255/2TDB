@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use rusqlite::types::Value as SqlValue;
-use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, Row, TransactionBehavior};
 
 use crate::Timestamp;
 use crate::database::{
@@ -92,15 +92,8 @@ impl Sqlite {
             "SELECT key, valid, kind, value FROM changes
              WHERE seq = ?1 ORDER BY key, valid",
         )?;
-        let rows = statement.query_map([id], |row| {
-            Ok(RawAssertion {
-                key: row.get(0)?,
-                valid_from: row.get(1)?,
-                value: RawValue::read(row, 2, 3)?,
-            })
-        })?;
-        let assertions = rows
-            .map(|row| row?.decode())
+        let assertions = statement
+            .query_and_then([id], read_assertion)?
             .collect::<Result<_, Error>>()?;
         Ok(Event {
             id,
@@ -117,12 +110,13 @@ impl Sqlite {
 
     pub(crate) fn history(&self, key: &str) -> Result<Vec<RecordedAssertion>, Error> {
         let mut statement = self.connection.prepare(
-            "SELECT c.seq, e.ts, c.key, c.valid, c.kind, c.value
+            "SELECT c.key, c.valid, c.kind, c.value, c.seq, e.ts
              FROM changes c JOIN events e ON e.seq = c.seq
              WHERE c.key = ?1 ORDER BY c.seq, c.valid",
         )?;
-        let rows = statement.query_map([key], RawRecordedAssertion::read)?;
-        rows.map(|row| row?.decode()).collect()
+        statement
+            .query_and_then([key], read_recorded_assertion)?
+            .collect()
     }
 
     pub(crate) fn commit(&mut self, writes: Vec<Write>) -> Result<EventId, Error> {
@@ -145,14 +139,8 @@ impl Sqlite {
                  VALUES (?1, ?2, ?3, ?4, ?5)",
             )?;
             for assertion in assertions {
-                let stored = RawValue::encode(assertion.value);
-                statement.execute((
-                    id,
-                    assertion.key,
-                    assertion.valid_from,
-                    stored.kind,
-                    stored.value,
-                ))?;
+                let (kind, value) = encode_value(assertion.value);
+                statement.execute((id, assertion.key, assertion.valid_from, kind, value))?;
             }
         }
         transaction.commit()?;
@@ -160,23 +148,22 @@ impl Sqlite {
     }
 
     pub(crate) fn get(&self, coordinate: Coordinate, key: &str) -> Result<Option<Value>, Error> {
-        let stored = self
-            .connection
-            .query_row(
-                "SELECT kind, value FROM changes
-                 WHERE key = ?1
-                   AND (?2 IS NULL OR valid <= ?2)
-                   AND seq <= ?3
-                 ORDER BY valid DESC, seq DESC LIMIT 1",
-                (
-                    key,
-                    coordinate.valid.micros(),
-                    coordinate.transaction.event_id(),
-                ),
-                |row| RawValue::read(row, 0, 1),
-            )
-            .optional()?;
-        stored.map_or(Ok(None), RawValue::decode)
+        let mut statement = self.connection.prepare(
+            "SELECT kind, value FROM changes
+             WHERE key = ?1
+               AND (?2 IS NULL OR valid <= ?2)
+               AND seq <= ?3
+             ORDER BY valid DESC, seq DESC LIMIT 1",
+        )?;
+        let mut rows = statement.query_and_then(
+            (
+                key,
+                coordinate.valid.micros(),
+                coordinate.transaction.event_id(),
+            ),
+            |row| read_value(row, 0, 1),
+        )?;
+        rows.next().transpose().map(Option::flatten)
     }
 
     pub(crate) fn blame(
@@ -184,24 +171,23 @@ impl Sqlite {
         coordinate: Coordinate,
         key: &str,
     ) -> Result<Option<RecordedAssertion>, Error> {
-        let raw = self
-            .connection
-            .query_row(
-                "SELECT c.seq, e.ts, c.key, c.valid, c.kind, c.value
-                 FROM changes c JOIN events e ON e.seq = c.seq
-                 WHERE c.key = ?1
-                   AND (?2 IS NULL OR c.valid <= ?2)
-                   AND c.seq <= ?3
-                 ORDER BY c.valid DESC, c.seq DESC LIMIT 1",
-                (
-                    key,
-                    coordinate.valid.micros(),
-                    coordinate.transaction.event_id(),
-                ),
-                RawRecordedAssertion::read,
-            )
-            .optional()?;
-        raw.map(RawRecordedAssertion::decode).transpose()
+        let mut statement = self.connection.prepare(
+            "SELECT c.key, c.valid, c.kind, c.value, c.seq, e.ts
+             FROM changes c JOIN events e ON e.seq = c.seq
+             WHERE c.key = ?1
+               AND (?2 IS NULL OR c.valid <= ?2)
+               AND c.seq <= ?3
+             ORDER BY c.valid DESC, c.seq DESC LIMIT 1",
+        )?;
+        let mut rows = statement.query_and_then(
+            (
+                key,
+                coordinate.valid.micros(),
+                coordinate.transaction.event_id(),
+            ),
+            read_recorded_assertion,
+        )?;
+        rows.next().transpose()
     }
 
     pub(crate) fn changepoints(
@@ -211,8 +197,9 @@ impl Sqlite {
         let mut statement = self
             .connection
             .prepare("SELECT DISTINCT valid FROM changes WHERE seq <= ?1 ORDER BY valid")?;
-        let rows = statement.query_map([transaction.event_id()], |row| row.get::<_, i64>(0))?;
-        rows.map(|row| timestamp(row?)).collect()
+        statement
+            .query_and_then([transaction.event_id()], |row| timestamp(row.get(0)?))?
+            .collect()
     }
 
     pub(crate) fn state(&self, coordinate: Coordinate) -> Result<State, Error> {
@@ -228,19 +215,19 @@ impl Sqlite {
              WHERE c.kind != ?3
              ORDER BY c.key",
         )?;
-        let rows = statement.query_map(
-            (
-                coordinate.valid.micros(),
-                coordinate.transaction.event_id(),
-                StorageKind::Delete as i64,
-            ),
-            |row| Ok((row.get::<_, String>(0)?, RawValue::read(row, 1, 2)?)),
-        )?;
-        rows.map(|row| {
-            let (key, value) = row?;
-            Ok((key, value.decode_present()?))
-        })
-        .collect()
+        statement
+            .query_and_then(
+                (
+                    coordinate.valid.micros(),
+                    coordinate.transaction.event_id(),
+                    StorageKind::Delete as i64,
+                ),
+                |row| {
+                    let value = read_value(row, 1, 2)?.ok_or(Error::Corrupt)?;
+                    Ok((row.get(0)?, value))
+                },
+            )?
+            .collect()
     }
 
     pub(crate) fn close(self) -> Result<(), Error> {
@@ -275,92 +262,46 @@ impl TryFrom<i64> for StorageKind {
     }
 }
 
-struct RawValue {
-    kind: i64,
-    value: SqlValue,
+fn encode_value(value: Option<Value>) -> (i64, SqlValue) {
+    let (kind, value) = match value {
+        Some(Value::Bool(value)) => (StorageKind::Bool, SqlValue::Integer(value.into())),
+        Some(Value::Int(value)) => (StorageKind::Int, SqlValue::Integer(value)),
+        Some(Value::Float(value)) => (StorageKind::Float, SqlValue::Real(value)),
+        Some(Value::Str(value)) => (StorageKind::Str, SqlValue::Text(value)),
+        None => (StorageKind::Delete, SqlValue::Null),
+    };
+    (kind as i64, value)
 }
 
-impl RawValue {
-    fn read(row: &rusqlite::Row<'_>, kind: usize, value: usize) -> rusqlite::Result<Self> {
-        Ok(RawValue {
-            kind: row.get(kind)?,
-            value: row.get(value)?,
-        })
-    }
-
-    fn encode(value: Option<Value>) -> Self {
-        let (kind, value) = match value {
-            Some(Value::Bool(value)) => (StorageKind::Bool, SqlValue::Integer(value.into())),
-            Some(Value::Int(value)) => (StorageKind::Int, SqlValue::Integer(value)),
-            Some(Value::Float(value)) => (StorageKind::Float, SqlValue::Real(value)),
-            Some(Value::Str(value)) => (StorageKind::Str, SqlValue::Text(value)),
-            None => (StorageKind::Delete, SqlValue::Null),
-        };
-        RawValue {
-            kind: kind as i64,
-            value,
-        }
-    }
-
-    fn decode(self) -> Result<Option<Value>, Error> {
-        match (StorageKind::try_from(self.kind)?, self.value) {
-            (StorageKind::Bool, SqlValue::Integer(0)) => Ok(Some(Value::Bool(false))),
-            (StorageKind::Bool, SqlValue::Integer(1)) => Ok(Some(Value::Bool(true))),
-            (StorageKind::Int, SqlValue::Integer(value)) => Ok(Some(Value::Int(value))),
-            (StorageKind::Float, SqlValue::Real(value)) => Ok(Some(Value::Float(value))),
-            (StorageKind::Str, SqlValue::Text(value)) => Ok(Some(Value::Str(value))),
-            (StorageKind::Delete, SqlValue::Null) => Ok(None),
-            _ => Err(Error::Corrupt),
-        }
-    }
-
-    fn decode_present(self) -> Result<Value, Error> {
-        self.decode()?.ok_or(Error::Corrupt)
+fn read_value(row: &Row<'_>, kind: usize, value: usize) -> Result<Option<Value>, Error> {
+    let kind = StorageKind::try_from(row.get::<_, i64>(kind)?)?;
+    match (kind, row.get::<_, SqlValue>(value)?) {
+        (StorageKind::Bool, SqlValue::Integer(0)) => Ok(Some(Value::Bool(false))),
+        (StorageKind::Bool, SqlValue::Integer(1)) => Ok(Some(Value::Bool(true))),
+        (StorageKind::Int, SqlValue::Integer(value)) => Ok(Some(Value::Int(value))),
+        (StorageKind::Float, SqlValue::Real(value)) => Ok(Some(Value::Float(value))),
+        (StorageKind::Str, SqlValue::Text(value)) => Ok(Some(Value::Str(value))),
+        (StorageKind::Delete, SqlValue::Null) => Ok(None),
+        _ => Err(Error::Corrupt),
     }
 }
 
-struct RawAssertion {
-    key: String,
-    valid_from: i64,
-    value: RawValue,
+// expects columns: key, valid, kind, value
+fn read_assertion(row: &Row<'_>) -> Result<Assertion, Error> {
+    Ok(Assertion {
+        key: row.get(0)?,
+        valid_from: timestamp(row.get(1)?)?,
+        value: read_value(row, 2, 3)?,
+    })
 }
 
-impl RawAssertion {
-    fn decode(self) -> Result<Assertion, Error> {
-        Ok(Assertion {
-            key: self.key,
-            valid_from: timestamp(self.valid_from)?,
-            value: self.value.decode()?,
-        })
-    }
-}
-
-struct RawRecordedAssertion {
-    event_id: EventId,
-    committed_at: i64,
-    assertion: RawAssertion,
-}
-
-impl RawRecordedAssertion {
-    fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
-        Ok(RawRecordedAssertion {
-            event_id: row.get(0)?,
-            committed_at: row.get(1)?,
-            assertion: RawAssertion {
-                key: row.get(2)?,
-                valid_from: row.get(3)?,
-                value: RawValue::read(row, 4, 5)?,
-            },
-        })
-    }
-
-    fn decode(self) -> Result<RecordedAssertion, Error> {
-        Ok(RecordedAssertion {
-            event_id: self.event_id,
-            committed_at: timestamp(self.committed_at)?,
-            assertion: self.assertion.decode()?,
-        })
-    }
+// expects read_assertion's columns, then: seq, ts
+fn read_recorded_assertion(row: &Row<'_>) -> Result<RecordedAssertion, Error> {
+    Ok(RecordedAssertion {
+        event_id: row.get(4)?,
+        committed_at: timestamp(row.get(5)?)?,
+        assertion: read_assertion(row)?,
+    })
 }
 
 fn timestamp(micros: i64) -> Result<Timestamp, Error> {

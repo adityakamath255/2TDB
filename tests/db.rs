@@ -581,3 +581,50 @@ fn commits_persist_and_the_views_answer_plain_sql() {
 
     std::fs::remove_file(&path).ok();
 }
+
+fn corrupted(sql: &str) -> Database {
+    let path = temp_path();
+    let mut db = Database::open(&path).unwrap();
+    db.commit([Write::set("x", 1)]).unwrap();
+    db.close().unwrap();
+
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch("PRAGMA ignore_check_constraints = ON")
+        .unwrap();
+    conn.execute_batch(sql).unwrap();
+    conn.close().unwrap();
+
+    let db = Database::open(&path).unwrap();
+    std::fs::remove_file(&path).ok();
+    db
+}
+
+#[test]
+fn corrupt_values_are_reported_on_every_read_path() {
+    for sql in [
+        "UPDATE changes SET value = 'oops'",
+        "UPDATE changes SET kind = 9",
+    ] {
+        let db = corrupted(sql);
+        let snapshot = db.latest().unwrap();
+        assert!(matches!(snapshot.get("x"), Err(Error::Corrupt)));
+        assert!(matches!(snapshot.blame("x"), Err(Error::Corrupt)));
+        assert!(matches!(snapshot.state(), Err(Error::Corrupt)));
+        assert!(matches!(db.history("x"), Err(Error::Corrupt)));
+        assert!(matches!(db.event(1), Err(Error::Corrupt)));
+    }
+}
+
+#[test]
+fn corrupt_timestamps_are_reported_on_every_read_path() {
+    let db = corrupted("UPDATE changes SET valid = 9223372036854775807");
+    let snapshot = db.latest().unwrap().valid_unbounded();
+    assert!(matches!(snapshot.blame("x"), Err(Error::Corrupt)));
+    assert!(matches!(snapshot.changepoints(), Err(Error::Corrupt)));
+    assert!(matches!(db.history("x"), Err(Error::Corrupt)));
+    assert!(matches!(db.event(1), Err(Error::Corrupt)));
+
+    let db = corrupted("UPDATE events SET ts = 9223372036854775807");
+    assert!(matches!(db.history("x"), Err(Error::Corrupt)));
+    assert!(matches!(db.event(1), Err(Error::Corrupt)));
+}
