@@ -24,10 +24,10 @@ Start Postgres and the API, then create a tenant and a key:
 ```sh
 docker compose up -d --wait
 docker compose exec db psql -U postgres -d two_tdb -c "INSERT INTO tenants (name) VALUES ('acme')"
-docker compose exec db psql -U postgres -d two_tdb -Atc "SELECT create_api_key(1, true)"
+KEY=$(docker compose exec db psql -U postgres -d two_tdb -Atc "SELECT create_api_key(1, true)")
 ```
 
-`create_api_key(tenant, writable)` prints the key once; the database keeps only its SHA-256 hash. A key made with `writable` false can read but not commit.
+`create_api_key(tenant, writable)` returns the key once; the database keeps only its SHA-256 hash. A key made with `writable` false can read but not commit.
 
 Record that a customer lived in Mumbai from January and moved to Pune in October:
 
