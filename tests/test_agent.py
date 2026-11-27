@@ -141,7 +141,7 @@ def test_store_errors_go_back_to_the_model(store):
     errors = [m.text for m in model.seen[-1] if isinstance(m, ToolMessage)]
     assert errors == [
         "error: 'shoe_size' is not a known attribute or note/<topic>",
-        "error: seats takes a int, got 'twelve'",
+        "error: seats takes int values, got 'twelve'",
         (
             "error: expected a datetime with a UTC offset, got "
             "datetime.datetime(2026, 3, 5, 10, 0)"

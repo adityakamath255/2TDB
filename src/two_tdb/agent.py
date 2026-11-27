@@ -147,7 +147,7 @@ def _write(fact: Fact) -> Write:
         value = float(value)
     if value is not None and type(value) is not kind:
         raise InvalidInput(
-            f"{fact.key} takes a {kind.__name__}, got {value!r}"
+            f"{fact.key} takes {kind.__name__} values, got {value!r}"
         )
     return Write(fact.key, value, fact.valid_from)
 
