@@ -1,6 +1,6 @@
 # 2TDB
 
-2TDB is a bitemporal key-value store served over HTTP. It records when each value was true (valid time) and when the store learned it (transaction time), so it can answer both "what was true on 1 March?" and "what did we believe on 5 March?". History is append-only: a correction is a new assertion, and earlier answers stay reproducible. It runs on Postgres, keeps each tenant's history apart with row-level security, and searches facts by meaning with pgvector. The repository also holds a customer-support agent on Claude Haiku 5.5 whose only memory is a 2TDB store, and an evaluation comparing it with plain retrieval-augmented generation.
+2TDB is a bitemporal key-value store served over HTTP. It records when each value was true (valid time) and when the store learned it (transaction time), so it can answer both "what was true on 1 March?" and "what did we believe on 5 March?". History is append-only. A correction is a new assertion, and earlier answers stay reproducible. It runs on Postgres, keeps each tenant's history apart with row-level security, and searches facts by meaning with pgvector. The repository also holds a customer-support agent on Claude Haiku 5.5 whose only memory is a 2TDB store, and an evaluation comparing it with plain retrieval-augmented generation.
 
 The earlier Rust library, an embedded store on SQLite, is on the [`rust`](https://github.com/adityakamath255/2TDB/tree/rust) branch (tag `rust-0.1.0`). Its predecessor in Python is [TTDB](https://github.com/adityakamath255/TTDB).
 
@@ -8,7 +8,7 @@ The earlier Rust library, an embedded store on SQLite, is on the [`rust`](https:
 
 The demo page at https://adityakamath255.github.io/2TDB/ charts each of one customer's facts over valid time and recording events, and queries the live API at the point you pick. The agent recorded them from the evaluation's 26 messages as 24 events, including corrections, back-dated moves and scheduled changes. The customer and its contact details are invented.
 
-The API runs at https://2tdb.duckdns.org. To call it yourself, open https://2tdb.duckdns.org/docs, choose Authorize and paste the key below, or use curl. The key is public on purpose: it reads only the demo tenant and can't commit.
+The API runs at https://2tdb.duckdns.org. To call it yourself, open https://2tdb.duckdns.org/docs, choose Authorize and paste the key below, or use curl. The key is public on purpose. It reads only the demo tenant and can't commit.
 
 ```sh
 KEY=2tdb_6a596f0e533c047d5e5828f6de4c398934073dd02a8c2f84ee7851a603b21f10
@@ -76,7 +76,7 @@ Reads take a snapshot as query parameters: `event` or `known_at` for the transac
 | `GET /diff` | how two snapshots differ, given as `from_event`, `to_valid_at`, and so on |
 | `GET /keys` | every key ever asserted |
 
-The API is a thin layer over a Python library, imported as `py2tdb` because a module name can't start with a digit. Its `Store` and read-only `Reader` offer the same operations, plus `bisect`, which finds the first event after which a predicate on the snapshot holds.
+The API calls a Python library, imported as `py2tdb` because a module name can't start with a digit. Its `Store` and read-only `Reader` offer the same operations, plus `bisect`, which finds the first event after which a predicate on the snapshot holds.
 
 ## Storage
 
@@ -86,7 +86,7 @@ Each assertion's text (`key: value`) is embedded with all-MiniLM-L6-v2 when it i
 
 ## Agent and evaluation
 
-`py2tdb.agent` is a support agent built with LangChain's `create_agent` on Claude Haiku 5.5. It handles each message without chat history: it reads the customer's facts through tools (`facts`, `lookup`, `blame`, `history`, `search`) and records new ones with `remember`, which commits with the message ID as the source. Facts are restricted to a fixed list of typed attributes plus free-text notes.
+`py2tdb.agent` is a support agent built with LangChain's `create_agent` on Claude Haiku 5.5. It handles each message without chat history. It reads the customer's facts through tools (`facts`, `lookup`, `blame`, `history`, `search`) and records new ones with `remember`, which commits with the message ID as the source. Facts are restricted to a fixed list of typed attributes plus free-text notes.
 
 The evaluation feeds 26 messages from one customer, January to October 2026, to the agent and to a baseline that stores the raw messages and answers from the five closest by meaning. The messages include changes, back-dated and scheduled facts, and eight corrections. Both then answer 24 questions: about current facts, facts at an earlier date, and what the records said before a correction. Answers are compared exactly after normalising case, spacing and punctuation.
 
@@ -95,7 +95,7 @@ The evaluation feeds 26 messages from one customer, January to October 2026, to 
 | 2TDB agent | 24/24 | 24/24 | 24/24 | 72/72 | 1.7 | 0.00048 | 0.0158 |
 | RAG baseline | 24/24 | 12/24 | 21/24 | 57/72 | 1.0 | 0.00009 | 0.0000 |
 
-Counts are over three repeats (27 Nov 2026). Ingesting is reading the 26 messages, once per repeat: the agent runs the model on each one, while the baseline only embeds them locally. The baseline's 15 misses are five questions it answered "unknown" in all three repeats. For each of them, five-message retrieval leaves out a message the answer needs, and for three it leaves out the first message. Run it with:
+Counts are over three repeats (27 Nov 2026). Ingesting means reading the 26 messages, once per repeat. The agent runs the model on each one, while the baseline only embeds them locally. The baseline's 15 misses are five questions it answered "unknown" in all three repeats. For each of them, five-message retrieval leaves out a message the answer needs, and for three it leaves out the first message. Run it with:
 
 ```sh
 docker compose up -d --wait db
@@ -116,7 +116,7 @@ PY2TDB_CORS_ORIGIN=https://adityakamath255.github.io
 
 `PY2TDB_CORS_ORIGIN` lets the demo page, which GitHub Pages serves from `docs/` on `main`, call the API from a browser. The page quotes each fact's source message from `docs/messages.json`, a copy of the scenario's messages that a test keeps equal to them.
 
-Then `docker compose up -d --build` starts it, and `git pull` with the same command updates it. The firewall opens ports 80 and 443; Postgres listens only on the VM itself. Building the image on the VM took over 10 minutes, and 22 minutes when the dependencies had changed; it peaked at 642 MB of memory; running, the three containers leave about 290 MB free, with 150 MB in swap.
+Then `docker compose up -d --build` starts it, and `git pull` with the same command updates it. The firewall opens ports 80 and 443; Postgres listens only on the VM itself. Building the image on the VM took over 10 minutes, and 22 minutes when the dependencies had changed; it peaked at 642 MB of memory. While running, the three containers leave about 290 MB free, with 150 MB in swap.
 
 The demo tenant was seeded from a laptop through an SSH tunnel to the VM's Postgres, so the Anthropic key never reached the VM:
 
@@ -143,6 +143,6 @@ CI runs the same tests on pushes to `main` and on pull requests, after `uv run r
 - Commits have no idempotency keys. A client that retries a commit after a timeout may record it twice; reads are unchanged unless another commit to the same key was made in between.
 - One tenant's commits run one at a time, so a stuck writer holds up that tenant until it times out.
 - The evaluation is one scripted customer and 24 questions. Its baseline retrieves five messages; with this few messages, putting all of them in the prompt would be a stronger baseline.
-- The evaluation asks about the transaction axis only relative to a correction ("before the customer corrected it"), never as of a date: the agent's tools see each fact's source message but not when it arrived, and commit times are when the evaluation ran.
+- The evaluation asks about the transaction axis only relative to a correction ("before the customer corrected it"), never as of a date. The agent's tools see each fact's source message but not when it arrived, and commit times are when the evaluation ran.
 - The agent's facts come from a fixed attribute list; anything else goes into free-text notes.
 - The demo is one small VM with no backups and no rate limit, so anyone with the public key can read the demo tenant as often as they like.
