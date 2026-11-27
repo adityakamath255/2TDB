@@ -139,7 +139,7 @@ class StateOut:
 
 
 @dataclass(frozen=True)
-class Fact:
+class Match:
     key: str
     value: Value
 
@@ -147,7 +147,7 @@ class Fact:
 @dataclass(frozen=True)
 class SearchOut:
     snapshot: SnapshotOut
-    matches: list[Fact]
+    matches: list[Match]
 
 
 @dataclass(frozen=True)
@@ -294,7 +294,7 @@ def create_app(conninfo: str, embed: Embed) -> FastAPI:
         """
         snapshot = query.snapshot(reader)
         matches = [
-            Fact(key, value)
+            Match(key, value)
             for key, value in snapshot.search(query.q, query.limit).items()
         ]
         return SearchOut(SnapshotOut.of(snapshot), matches)
