@@ -157,9 +157,7 @@ class Reader:
         return Snapshot(self, event_id, row[0])
 
     def known_at(self, time: datetime) -> Snapshot:
-        """Returns what the store held at wall-clock time, valid up to that
-        time.
-        """
+        """Returns what the store held at wall-clock time, valid up to then."""
         aware(time)
         with self._transaction() as db:
             [(event_id,)] = db.execute(
@@ -205,9 +203,7 @@ class Reader:
         )
 
     def keys(self) -> list[str]:
-        """Returns every key ever asserted, deleted ones included, in ascending
-        order.
-        """
+        """Returns the sorted keys ever asserted, deleted ones included."""
         with self._transaction() as db:
             rows = db.execute(
                 t"{_KEYS:q} SELECT key FROM keys WHERE key IS NOT NULL"
@@ -343,9 +339,7 @@ class Snapshot:
         return None if row is None else _decode(row)
 
     def blame(self, key: str) -> RecordedAssertion | None:
-        """Returns the assertion that decides get(key), including a
-        deletion.
-        """
+        """Returns the assertion deciding get(key), deletions included."""
         winner = self._winner(t"{key}")
         with self.reader._transaction() as db:
             row = db.execute(t"""
@@ -377,9 +371,7 @@ class Snapshot:
         return {key: _value(columns) for key, *columns in rows}
 
     def search(self, text: str, limit: int = 5) -> dict[str, Value]:
-        """Returns up to limit of the values held here, closest in meaning to
-        text first.
-        """
+        """Returns up to limit values held here, most similar to text first."""
         if limit < 1:
             raise InvalidInput(f"limit must be positive, got {limit}")
         (query,) = self.reader._embed([text])
@@ -394,9 +386,7 @@ class Snapshot:
         return {key: _value(columns) for key, *columns in rows}
 
     def changepoints(self) -> list[datetime]:
-        """Returns every valid time at which some key changes, as of
-        event_id.
-        """
+        """Returns every valid time when some key changes, as of event_id."""
         with self.reader._transaction() as db:
             rows = db.execute(t"""
                 SELECT DISTINCT valid FROM changes

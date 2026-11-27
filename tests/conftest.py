@@ -89,9 +89,7 @@ def new_tenant(owner: psycopg.Connection) -> Callable[[], int]:
 def new_store(
     new_tenant: Callable[[], int], connect_app
 ) -> Callable[[], Store]:
-    """Returns a Store for a fresh tenant on its own connection, so each
-    starts empty.
-    """
+    """Returns a Store for a fresh, empty tenant on its own connection."""
     return lambda: Store(connect_app(), new_tenant(), embed)
 
 

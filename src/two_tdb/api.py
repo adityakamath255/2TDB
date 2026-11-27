@@ -216,9 +216,7 @@ type ReaderDep = Annotated[Reader, Depends(_reader)]
 
 
 def create_app(conninfo: str, embed: Embed) -> FastAPI:
-    """Returns the HTTP API over the database at conninfo, which must log in
-    as two_tdb_app.
-    """
+    """Returns the HTTP API; conninfo must log in as two_tdb_app."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -276,9 +274,7 @@ def create_app(conninfo: str, embed: Embed) -> FastAPI:
 
     @app.get("/blame")
     def blame(query: Annotated[KeyAt, Query()], reader: ReaderDep) -> BlameOut:
-        """Returns the assertion that decides the key's value, including a
-        deletion.
-        """
+        """Returns the assertion deciding key's value, deletions included."""
         snapshot = query.snapshot(reader)
         return BlameOut(
             SnapshotOut.of(snapshot), query.key, snapshot.blame(query.key)

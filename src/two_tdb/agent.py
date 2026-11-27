@@ -162,9 +162,7 @@ def remember(facts: list[Fact], runtime: ToolRuntime[Context]) -> str:
 def facts(
     runtime: ToolRuntime[Context], valid_at: datetime | None = None
 ) -> str:
-    """Returns every fact true at valid_at (default: now), as the store holds
-    them now.
-    """
+    """Returns every fact true at valid_at (default: now), as known now."""
     return _json(_snapshot(runtime.context.store, valid_at).state())
 
 
@@ -172,9 +170,7 @@ def facts(
 def lookup(
     key: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None
 ) -> str:
-    """Returns the value of key at valid_at (default: now), or null if it
-    has none.
-    """
+    """Returns key's value at valid_at (default: now), or null if none."""
     return _json(_snapshot(runtime.context.store, valid_at).get(key))
 
 
@@ -182,9 +178,7 @@ def lookup(
 def blame(
     key: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None
 ) -> str:
-    """Returns the recorded fact that decides key's value at valid_at
-    (default: now).
-    """
+    """Returns the record deciding key's value at valid_at (default: now)."""
     entry = _snapshot(runtime.context.store, valid_at).blame(key)
     return _json(None if entry is None else _recorded(entry))
 
@@ -203,9 +197,7 @@ def history(key: str, runtime: ToolRuntime[Context]) -> str:
 def search(
     query: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None
 ) -> str:
-    """Returns the facts true at valid_at (default: now) closest in meaning
-    to query.
-    """
+    """Returns the facts at valid_at (default: now) most similar to query."""
     return _json(_snapshot(runtime.context.store, valid_at).search(query))
 
 
@@ -216,9 +208,7 @@ def _store_error(error: Exception, request: object) -> str | None:
 
 
 def chat_model() -> ChatAnthropic:
-    """Claude Haiku through the Anthropic SDK, which reads
-    ANTHROPIC_API_KEY.
-    """
+    """Claude Haiku via the Anthropic SDK, which reads ANTHROPIC_API_KEY."""
     # pyright reads the model's pydantic field aliases and positional Field
     # defaults as required parameters
     return ChatAnthropic(model=MODEL, max_tokens=4096)  # pyright: ignore[reportCallIssue]

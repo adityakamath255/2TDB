@@ -1,5 +1,4 @@
-"""One customer's messages from January to October 2026, and questions
-about them.
+"""One customer's messages from January to October 2026, with questions.
 
 Kinds of question:
 - current: what is true when the question is asked

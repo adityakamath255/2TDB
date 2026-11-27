@@ -7,9 +7,7 @@ MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 class Embedder:
-    """Embeds text with MODEL, downloading it to FASTEMBED_CACHE_PATH on
-    first use.
-    """
+    """Embeds text with MODEL, fetched to FASTEMBED_CACHE_PATH on first use."""
 
     def __init__(self) -> None:
         self._model = TextEmbedding(MODEL, threads=1)

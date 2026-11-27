@@ -29,9 +29,7 @@ class OutOfRange(StoreError):
 
 
 def aware(time: datetime) -> datetime:
-    """Returns time unchanged; raises InvalidInput unless it has a UTC
-    offset.
-    """
+    """Returns time if it has a UTC offset; raises InvalidInput otherwise."""
     if not isinstance(time, datetime) or time.utcoffset() is None:
         raise InvalidInput(
             f"expected a datetime with a UTC offset, got {time!r}"
@@ -71,8 +69,7 @@ def check_source(source: object) -> None:
 
 @dataclass(frozen=True)
 class Write:
-    """One assertion to commit: a value for key from valid_from on, or None
-    to delete.
+    """An assertion to commit: key's value from valid_from on (None deletes).
 
     A write without valid_from takes effect at its event's commit time.
     """

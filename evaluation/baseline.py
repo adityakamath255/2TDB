@@ -1,5 +1,4 @@
-"""The baseline: plain retrieval-augmented generation over the customer's
-raw messages.
+"""The baseline: plain RAG over the customer's raw messages.
 
 It keeps every customer message with its sent time, and answers a question
 from the messages closest in meaning to it, with the same model and embedder
@@ -42,9 +41,7 @@ class Notes:
         self._messages.append((message, vector))
 
     def search(self, text: str, limit: int = RETRIEVED) -> list[Message]:
-        """Returns the limit messages closest in meaning to text, oldest
-        first.
-        """
+        """Returns the limit messages most similar to text, oldest first."""
         (query,) = self._embed([text])
         ranked = sorted(
             self._messages, key=lambda entry: -_cosine(query, entry[1])
