@@ -34,5 +34,25 @@ services:
       interval: 2s
       retries: 15
 
+  # HTTPS in front of the app, for a public server: set COMPOSE_PROFILES=public
+  # and DOMAIN in .env
+  caddy:
+    image: caddy:2.11.9
+    profiles: [public]
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   db:
+  caddy:

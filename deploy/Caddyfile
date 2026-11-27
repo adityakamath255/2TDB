@@ -1,0 +1,4 @@
+# caddy gets and renews the HTTPS certificate for DOMAIN on its own
+{$DOMAIN} {
+	reverse_proxy app:8000
+}
