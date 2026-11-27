@@ -1352,8 +1352,11 @@ dependencies = [
     { name = "fastembed" },
     { name = "langchain" },
     { name = "langchain-anthropic" },
+    { name = "langchain-core" },
+    { name = "langgraph" },
     { name = "psycopg", extra = ["binary"] },
     { name = "psycopg-pool" },
+    { name = "pydantic" },
     { name = "uvicorn" },
 ]
 
@@ -1372,8 +1375,11 @@ requires-dist = [
     { name = "fastembed", specifier = ">=0.9.1" },
     { name = "langchain", specifier = ">=1.5.2" },
     { name = "langchain-anthropic", specifier = ">=1.7.13" },
+    { name = "langchain-core", specifier = ">=1.8.5" },
+    { name = "langgraph", specifier = ">=1.2.24" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.9" },
     { name = "psycopg-pool", specifier = ">=3.3.3" },
+    { name = "pydantic", specifier = ">=2.14.4" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
