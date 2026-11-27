@@ -6,7 +6,7 @@ The earlier Rust library, an embedded store on SQLite, is on the [`rust`](https:
 
 ## Demo
 
-A read-only copy runs at https://2tdb.duckdns.org. It holds the evaluation's customer: the agent read the 26 scenario messages and recorded 24 events, including corrected details and a back-dated move. Open https://2tdb.duckdns.org/docs, choose Authorize and paste the key below, or use curl:
+A read-only copy runs at https://2tdb.duckdns.org. It holds the evaluation's customer: the agent read the 26 scenario messages and recorded 24 events, including corrected details and a back-dated move. The page at https://adityakamath255.github.io/2TDB/ charts each key over valid time and events, and queries the API at the point you pick. To call the API yourself, open https://2tdb.duckdns.org/docs, choose Authorize and paste the key below, or use curl:
 
 ```sh
 KEY=2tdb_6a596f0e533c047d5e5828f6de4c398934073dd02a8c2f84ee7851a603b21f10
@@ -109,7 +109,10 @@ COMPOSE_PROFILES=public
 DOMAIN=2tdb.duckdns.org
 POSTGRES_PASSWORD=...
 TWO_TDB_APP_PASSWORD=...
+TWO_TDB_CORS_ORIGIN=https://adityakamath255.github.io
 ```
+
+`TWO_TDB_CORS_ORIGIN` lets the demo page, which GitHub Pages serves from `docs/` on `main`, call the API from a browser. The page quotes each fact's source message from `docs/messages.json`, a copy of the scenario's messages that a test keeps equal to them.
 
 Then `docker compose up -d --build` starts it, and `git pull` with the same command updates it. The firewall opens ports 80 and 443; Postgres listens only on the VM itself. Building the image on the VM took over 10 minutes and peaked at 642 MB of memory; running, the three containers leave about 290 MB free, with 150 MB in swap.
 

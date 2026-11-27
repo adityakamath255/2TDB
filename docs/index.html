@@ -24,7 +24,7 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root {
     --bg: #141517;
     --surface: #1c1d20;
     --text: #e8e8e4;
@@ -38,12 +38,6 @@
     --code-bg: #232428;
     color-scheme: dark;
   }
-}
-:root[data-theme="dark"] {
-  --bg: #141517; --surface: #1c1d20; --text: #e8e8e4; --muted: #a2a5ab;
-  --line: #34363b; --grid: #26282c; --accent: #8fb0f5; --accent-soft: #24304a;
-  --mark: #f2f2ee; --v0: #2b4170; --v1: #5e4a22; --v2: #47396a; --v3: #24504c;
-  --v4: #5c3341; --code-bg: #232428; color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -105,7 +99,9 @@ button.copy {
 }
 button.copy:hover { border-color: var(--muted); }
 .value { font-family: "IBM Plex Mono", monospace; font-size: 1.5rem; font-weight: 500; margin: 14px 0 4px; word-break: break-word; }
+.value.long { font: 400 1.05rem/1.5 "IBM Plex Sans", sans-serif; }
 .value.none { color: var(--muted); font-size: 1.1rem; font-weight: 400; }
+.answer .panel.stale #answer-text { opacity: 0.45; }
 .because { color: var(--muted); margin: 0; font-size: 0.92rem; }
 blockquote { margin: 12px 0 0; padding: 10px 14px; background: var(--code-bg); border-radius: 6px; font-size: 0.93rem; }
 blockquote footer { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
@@ -165,14 +161,14 @@ tr.decides .status { color: var(--text); font-weight: 500; }
     <section aria-labelledby="chart-h" id="main">
       <div class="chart-head">
         <h2 id="chart-h">Value of <code id="key-name">…</code></h2>
-        <p class="hint">Click or use the arrow keys: ← → move valid time by a week, ↑ ↓ move one event.</p>
+        <p class="hint">Click the chart to pick a point; then ← → move it a week and ↑ ↓ one event.</p>
       </div>
       <figure>
         <svg class="plane" id="plane" tabindex="0" role="img" aria-describedby="answer-text"></svg>
       </figure>
 
       <div class="answer">
-        <div class="panel" aria-live="polite">
+        <div class="panel" id="answer-panel" aria-live="polite">
           <div class="request">
             <code id="request"></code>
             <button class="copy" id="copy" type="button">Copy as curl</button>
@@ -222,7 +218,8 @@ async function get(path, params = {}) {
 
 const fmtDate = (ms) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const iso = (ms) => new Date(ms).toISOString().replace(".000Z", "Z");
-const show = (v) => typeof v === "string" ? v : JSON.stringify(v);
+// a null value is a deletion
+const show = (v) => v === null ? "deleted" : typeof v === "string" ? v : JSON.stringify(v);
 
 // the store's rule, for drawing only: the assertion with the latest valid
 // time not after t wins, and among equal valid times the latest event
@@ -238,13 +235,16 @@ function segments(history, event) {
   }));
 }
 
+// a correction re-asserts the same valid time in a later event; returns
+// each corrected assertion's event mapped to the event that corrected it
 function corrections(history) {
-  const by = new Map();
+  const latest = new Map(), corrected = new Map();
   for (const a of history) {
     const at = a.assertion.valid_from;
-    if (by.has(at)) by.get(at).correctedBy = a.event_id;
-    by.set(at, a);
+    if (latest.has(at)) corrected.set(latest.get(at), a.event_id);
+    latest.set(at, a.event_id);
   }
+  return corrected;
 }
 
 const xOf = (ms) => L + (Math.max(X0, Math.min(X1, ms)) - X0) / (X1 - X0) * (W - L - R);
@@ -286,6 +286,7 @@ function drawPlane() {
       const g = el("g", { class: "seg" });
       const x1 = xOf(seg.from), x2 = xOf(seg.to);
       const label = show(seg.assertion.assertion.value);
+      if (seg.assertion.assertion.value === null) continue;
       g.append(el("rect", { x: x1, y: y1, width: Math.max(0, x2 - x1), height: h, fill: `var(--v${values.indexOf(label) % 5})` }));
       g.append(el("title", {}, `${label}, valid from ${fmtDate(seg.from)}, recorded by event ${seg.assertion.event_id}`));
       if (x2 - x1 > 8 * label.length + 12) g.append(el("text", { x: x1 + 6, y: y2 - 8 }, label));
@@ -295,9 +296,11 @@ function drawPlane() {
     svg.append(el("text", { x: L - 8, y: (y1 + y2) / 2 + 4, "text-anchor": "end" }, row.to > row.from ? `events ${row.from}–${row.to}` : `event ${row.from}`));
   });
 
-  const now = xOf(Date.now());
-  svg.append(el("line", { class: "now", x1: now, x2: now, y1: T, y2: H - B }));
-  svg.append(el("text", { class: "now-label", x: now, y: H - 4, "text-anchor": "middle" }, "today"));
+  if (Date.now() < X1) {
+    const now = xOf(Date.now());
+    svg.append(el("line", { class: "now", x1: now, x2: now, y1: T, y2: H - B }));
+    svg.append(el("text", { class: "now-label", x: now, y: H - 4, "text-anchor": "middle" }, "today"));
+  }
   svg.append(el("line", { class: "axis", x1: L, x2: L, y1: T, y2: H - B }));
 
   const at = bands.findIndex((row) => row.from <= state.event && state.event <= row.to);
@@ -308,16 +311,16 @@ function drawPlane() {
 }
 
 function drawHistory(decidingEvent) {
-  const history = state.histories[state.key].map((a) => ({ ...a }));
-  corrections(history);
+  const history = state.histories[state.key];
+  const corrected = corrections(history);
   $("history").replaceChildren(...history.map((a) => {
     const tr = document.createElement("tr");
     const decides = a.event_id === decidingEvent;
     if (decides) tr.className = "decides";
-    const later = a.event_id > state.event;
     const status = decides ? "answers your query"
-      : a.correctedBy ? `corrected by event ${a.correctedBy}`
-      : later ? `not yet known at event ${state.event}` : "";
+      : a.event_id > state.event ? `not yet known at event ${state.event}`
+      : corrected.has(a.event_id) ? `corrected by event ${corrected.get(a.event_id)}`
+      : "";
     for (const [text, cls] of [
       [`${a.event_id} · ${a.source}`, "mono"],
       [fmtDate(Date.parse(a.assertion.valid_from)), "mono"],
@@ -333,33 +336,39 @@ function drawHistory(decidingEvent) {
   }));
 }
 
+const params = () => ({ key: state.key, event: state.event, valid_at: iso(state.validAt) });
+
 let pending = 0;
 async function query() {
-  const params = { key: state.key, event: state.event, valid_at: iso(state.validAt) };
-  $("request").innerHTML = "";
   const verb = document.createElement("span");
   verb.className = "verb";
   verb.textContent = "GET ";
-  const path = decodeURIComponent(url("/blame", params)).replace(API, "");
-  $("request").append(verb, ...path.split(/(?=[?&])/).flatMap((part) => [document.createElement("wbr"), part]));
+  const path = decodeURIComponent(url("/blame", params())).replace(API, "");
+  $("request").replaceChildren(verb, ...path.split(/(?=[?&])/).flatMap((part) => [document.createElement("wbr"), part]));
   $("plane").setAttribute("aria-label", `Chart of ${state.key}; selected event ${state.event}, valid ${fmtDate(state.validAt)}`);
   drawPlane();
   const ticket = ++pending;
+  $("answer-panel").classList.add("stale");
   let body;
   try {
-    body = await get("/blame", params);
+    body = await get("/blame", params());
   } catch (error) {
-    if (ticket === pending) $("answer-text").innerHTML = `<p class="because">The API didn't answer (${error.message}). The server at 2tdb.duckdns.org may be down; try again in a minute.</p>`;
+    if (ticket !== pending) return;
+    $("answer-panel").classList.remove("stale");
+    $("json").textContent = "";
+    $("answer-text").innerHTML = `<p class="because">The API didn't answer (${error.message}). The server at 2tdb.duckdns.org may be down; try again in a minute.</p>`;
     return;
   }
   if (ticket !== pending) return;
+  $("answer-panel").classList.remove("stale");
   $("json").textContent = JSON.stringify(body, null, 2);
   const a = body.assertion;
   const out = $("answer-text");
   out.replaceChildren();
   const value = document.createElement("p");
-  value.className = a ? "value" : "value none";
-  value.textContent = a ? show(a.assertion.value) : "no value";
+  const text = a ? show(a.assertion.value) : "no value";
+  value.className = !a ? "value none" : text.length > 24 ? "value long" : "value";
+  value.textContent = text;
   out.append(value);
   const because = document.createElement("p");
   because.className = "because";
@@ -392,9 +401,9 @@ function move(event, validAt) {
   query();
 }
 
+// draws the chart at the size it's shown, so its text stays at 11-12px
 function fit() {
-  const width = $("plane").parentElement.clientWidth - 24;
-  W = Math.max(300, Math.round(width));
+  W = Math.max(300, Math.round($("plane").getBoundingClientRect().width));
   H = W < 560 ? 260 : 330;
 }
 let resizing;
@@ -423,8 +432,7 @@ $("plane").addEventListener("keydown", (e) => {
   move(state.event + step[0], state.validAt + step[1] * DAY);
 });
 $("copy").addEventListener("click", async () => {
-  const params = { key: state.key, event: state.event, valid_at: iso(state.validAt) };
-  const curl = `curl -H "Authorization: Bearer ${KEY}" "${url("/blame", params)}"`;
+  const curl = `curl -H "Authorization: Bearer ${KEY}" "${url("/blame", params())}"`;
   try {
     await navigator.clipboard.writeText(curl);
     $("copy").textContent = "Copied";
@@ -438,21 +446,24 @@ async function start() {
   try {
     const [keys, messages] = await Promise.all([
       get("/keys"),
-      fetch("messages.json").then((r) => r.json()),
+      fetch("messages.json").then((r) => {
+        if (!r.ok) throw new Error(`messages.json answered ${r.status}`);
+        return r.json();
+      }),
     ]);
     state.messages = messages;
     const histories = await Promise.all(keys.map((key) => get("/history", { key })));
     keys.forEach((key, i) => { state.histories[key] = histories[i]; });
   } catch (error) {
-    $("main").innerHTML = `<div class="error">The API at 2tdb.duckdns.org didn't answer (${error.message}). The demo server may be down or restarting; the <a href="https://github.com/adityakamath255/2TDB">source and README</a> describe what this page shows.</div>`;
+    $("main").innerHTML = `<div class="error">The demo data didn't load (${error.message}). The API server at 2tdb.duckdns.org may be down or restarting; the <a href="https://github.com/adityakamath255/2TDB">source and README</a> describe what this page shows.</div>`;
     $("keys").replaceChildren();
     return;
   }
   state.lastEvent = Math.max(...Object.values(state.histories).flat().map((a) => a.event_id));
-  const keys = Object.keys(state.histories).filter((k) => !k.startsWith("note/"));
+  const keys = Object.keys(state.histories);
   $("keys").replaceChildren(...keys.map((key) => {
     const history = state.histories[key];
-    const corrected = new Set(history.map((a) => a.assertion.valid_from)).size < history.length;
+    const corrected = corrections(history).size > 0;
     const li = document.createElement("li");
     const b = document.createElement("button");
     b.type = "button";
@@ -469,7 +480,7 @@ async function start() {
   fit();
   state.event = state.lastEvent;
   state.validAt = Date.UTC(2026, 5, 1);
-  select("seats");
+  select(keys.includes("seats") ? "seats" : keys[0]);
 }
 start();
 </script>

@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 from evaluation.run import correct, evaluate, report
@@ -57,3 +60,15 @@ def test_the_harness_scores_each_system_and_kind(new_store):
     # 1,000 input and 100 output tokens per call:
     # (1000 * 0.10 + 100 * 0.50) / 1e6
     assert "| 0.00015 | 0.0039 |" in table
+
+
+def test_the_demo_page_quotes_the_scenario_messages():
+    # the page quotes the message behind each fact from this copy
+    page = Path(__file__).parent.parent / "docs" / "messages.json"
+    assert json.loads(page.read_text()) == {
+        message.id: {
+            "sent_at": message.sent_at.isoformat(),
+            "text": message.text,
+        }
+        for message in MESSAGES
+    }
