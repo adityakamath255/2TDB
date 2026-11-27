@@ -7,10 +7,11 @@ knows from earlier messages is what it wrote to the store.
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
+    AgentMiddleware,
     ToolCallLimitMiddleware,
     ToolErrorMiddleware,
 )
@@ -218,22 +219,25 @@ def chat_model() -> ChatAnthropic:
     """Claude Haiku through the Anthropic SDK, which reads
     ANTHROPIC_API_KEY.
     """
-    return ChatAnthropic(model=MODEL, max_tokens=4096)
+    # pyright reads the model's pydantic field aliases and positional Field
+    # defaults as required parameters
+    return ChatAnthropic(model=MODEL, max_tokens=4096)  # pyright: ignore[reportCallIssue]
 
 
 def build(model: BaseChatModel):
     """Returns the agent graph, to run with respond."""
+    middleware: list[AgentMiddleware[Any, Context]] = [
+        ToolErrorMiddleware(on_error=_store_error),
+        ToolCallLimitMiddleware(
+            run_limit=TOOL_CALLS_PER_MESSAGE, exit_behavior="end"
+        ),
+    ]
     return create_agent(
         model,
         [remember, facts, lookup, blame, history, search],
         system_prompt=SYSTEM_PROMPT,
         context_schema=Context,
-        middleware=[
-            ToolErrorMiddleware(on_error=_store_error),
-            ToolCallLimitMiddleware(
-                run_limit=TOOL_CALLS_PER_MESSAGE, exit_behavior="end"
-            ),
-        ],
+        middleware=middleware,
     )
 
 

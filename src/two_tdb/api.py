@@ -11,6 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg_pool import ConnectionPool, PoolTimeout
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
+from two_tdb.embedding import Embedder
 from two_tdb.model import (
     Added,
     Changed,
@@ -24,7 +25,6 @@ from two_tdb.model import (
     Value,
     Write,
 )
-from two_tdb.embedding import Embedder
 from two_tdb.store import Embed, Reader, Snapshot, Store
 
 
@@ -37,7 +37,7 @@ class At(BaseModel, extra="forbid"):
     valid_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
-    def _one_transaction_time(self) -> "At":
+    def _one_transaction_time(self) -> At:
         if self.event is not None and self.known_at is not None:
             raise ValueError("give event or known_at, not both")
         return self
@@ -78,7 +78,7 @@ class DiffQuery(BaseModel, extra="forbid"):
     to_valid_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
-    def _sides_are_snapshots(self) -> "DiffQuery":
+    def _sides_are_snapshots(self) -> DiffQuery:
         self.sides()
         return self
 
@@ -114,7 +114,7 @@ class SnapshotOut:
     valid_at: datetime | None
 
     @classmethod
-    def of(cls, snapshot: Snapshot) -> "SnapshotOut":
+    def of(cls, snapshot: Snapshot) -> SnapshotOut:
         return cls(snapshot.event_id, snapshot.valid_through)
 
 
@@ -163,7 +163,7 @@ class DeltaOut:
     after: Value | None
 
     @classmethod
-    def of(cls, delta: Delta) -> "DeltaOut":
+    def of(cls, delta: Delta) -> DeltaOut:
         match delta:
             case Added(value):
                 return cls("added", None, value)
@@ -195,10 +195,10 @@ def _reader(
     pool: ConnectionPool = request.app.state.pool
     embed: Embed = request.app.state.embed
     with pool.connection() as connection:
-        tenant, writable = connection.execute(
+        [(tenant, writable)] = connection.execute(
             "SELECT tenant, writable FROM api_key_tenant(%s)",
             [credentials.credentials],
-        ).fetchone()
+        ).fetchall()
         if tenant is None:
             raise HTTPException(
                 401, "unknown API key", headers={"WWW-Authenticate": "Bearer"}

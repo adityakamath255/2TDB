@@ -50,7 +50,7 @@ def install(connection: psycopg.Connection) -> None:
 
     Run as the owner of an empty database.
     """
-    connection.execute(files("two_tdb").joinpath("schema.sql").read_text())
+    connection.execute(files("two_tdb").joinpath("schema.sql").read_bytes())
 
 
 def _encode(
@@ -79,8 +79,13 @@ def _vector(vector: Sequence[float]) -> str:
 
 # expects columns: kind, bool_value, int_value, float_value, str_value
 def _decode(columns: Sequence) -> Value | None:
+    return None if columns[0] == "delete" else _value(columns)
+
+
+# expects _decode's columns, of a kind other than delete
+def _value(columns: Sequence) -> Value:
     kind, *values = columns
-    return None if kind == "delete" else values[_KINDS.index(kind)]
+    return values[_KINDS.index(kind)]
 
 
 # expects columns: key, valid, seq, committed_at, source, then _decode's
@@ -125,9 +130,10 @@ class Reader:
 
     @staticmethod
     def _length(db: psycopg.Connection) -> int:
-        return db.execute(
+        [(length,)] = db.execute(
             "SELECT coalesce(max(seq), 0) FROM events"
-        ).fetchone()[0]
+        ).fetchall()
+        return length
 
     def length(self) -> int:
         """Returns the number of events committed."""
@@ -137,7 +143,7 @@ class Reader:
     def is_empty(self) -> bool:
         return self.length() == 0
 
-    def at(self, event_id: int) -> "Snapshot":
+    def at(self, event_id: int) -> Snapshot:
         """Returns the store as it stood right after event_id was committed.
 
         Raises OutOfRange if there is no such event.
@@ -150,25 +156,25 @@ class Reader:
                 raise OutOfRange(event_id, self._length(db))
         return Snapshot(self, event_id, row[0])
 
-    def known_at(self, time: datetime) -> "Snapshot":
+    def known_at(self, time: datetime) -> Snapshot:
         """Returns what the store held at wall-clock time, valid up to that
         time.
         """
         aware(time)
         with self._transaction() as db:
-            (event_id,) = db.execute(
+            [(event_id,)] = db.execute(
                 t"SELECT max(seq) FROM events WHERE committed_at <= {time}"
-            ).fetchone()
+            ).fetchall()
         return Snapshot(self, event_id, time)
 
-    def latest(self) -> "Snapshot":
+    def latest(self) -> Snapshot:
         """Returns the store after its last event, valid up to now."""
         with self._transaction() as db:
-            event_id, now = db.execute("""
+            [(event_id, now)] = db.execute("""
                 SELECT max(seq),
                        greatest(clock_timestamp(), max(committed_at))
                 FROM events
-            """).fetchone()
+            """).fetchall()
         return Snapshot(self, event_id, now)
 
     def event(self, event_id: int) -> Event:
@@ -221,7 +227,7 @@ class Reader:
             """).fetchall()
         return [_recorded(row) for row in rows]
 
-    def bisect(self, predicate: Callable[["Snapshot"], bool]) -> int | None:
+    def bisect(self, predicate: Callable[[Snapshot], bool]) -> int | None:
         """Returns the first event whose snapshot satisfies predicate, or None.
 
         Assumes predicate is false up to some event and true from it on.
@@ -261,14 +267,14 @@ class Store(Reader):
         ]
         with self._transaction(read_only=False) as db:
             db.execute(t"SELECT pg_advisory_xact_lock({self.tenant}::bigint)")
-            event_id, committed_at = db.execute(t"""
+            [(event_id, committed_at)] = db.execute(t"""
                 INSERT INTO events (seq, committed_at, source)
                 SELECT coalesce(max(seq), 0) + 1,
                        greatest(clock_timestamp(), max(committed_at)),
                        {source}
                 FROM events
                 RETURNING seq, committed_at
-            """).fetchone()
+            """).fetchall()
             latest = {
                 (
                     write.key,
@@ -316,10 +322,10 @@ class Snapshot:
     event_id: int | None
     valid_through: datetime | None
 
-    def valid_at(self, time: datetime) -> "Snapshot":
+    def valid_at(self, time: datetime) -> Snapshot:
         return replace(self, valid_through=aware(time))
 
-    def valid_unbounded(self) -> "Snapshot":
+    def valid_unbounded(self) -> Snapshot:
         return replace(self, valid_through=None)
 
     def get(self, key: str) -> Value | None:
@@ -384,7 +390,7 @@ class Snapshot:
                 WHERE kind <> 'delete'
                 ORDER BY key
             """).fetchall()
-        return {key: _decode(columns) for key, *columns in rows}
+        return {key: _value(columns) for key, *columns in rows}
 
     def search(self, text: str, limit: int = 5) -> dict[str, Value]:
         """Returns up to limit of the values held here, closest in meaning to
@@ -401,7 +407,7 @@ class Snapshot:
                 ORDER BY embedding <=> {_vector(query)}::vector, key
                 LIMIT {limit}
             """).fetchall()
-        return {key: _decode(columns) for key, *columns in rows}
+        return {key: _value(columns) for key, *columns in rows}
 
     def changepoints(self) -> list[datetime]:
         """Returns every valid time at which some key changes, as of
@@ -415,7 +421,7 @@ class Snapshot:
             """).fetchall()
         return [valid for (valid,) in rows]
 
-    def diff(self, other: "Snapshot") -> dict[str, Delta]:
+    def diff(self, other: Snapshot) -> dict[str, Delta]:
         """Returns how other differs from this snapshot, by key."""
         before, after = self.state(), other.state()
         deltas: dict[str, Delta] = {}

@@ -134,10 +134,10 @@ def _stores(embed: Embed) -> Iterator[Callable[[], Store]]:
         opened: list[psycopg.Connection] = []
 
         def new_store() -> Store:
-            (tenant,) = owner.execute(
+            [(tenant,)] = owner.execute(
                 "INSERT INTO tenants (name) VALUES (%s) RETURNING id",
                 [f"eval-{len(opened)}"],
-            ).fetchone()
+            ).fetchall()
             connection = psycopg.connect(
                 f"{SERVER}/{DATABASE}", autocommit=True
             )
@@ -222,7 +222,10 @@ def report(ingests: list[Ingest], results: list[Result]) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--repeats", type=int, default=3)
     args = parser.parse_args()
 

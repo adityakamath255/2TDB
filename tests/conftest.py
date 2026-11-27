@@ -2,7 +2,7 @@ import os
 import re
 import uuid
 import zlib
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 
 import psycopg
 import pytest
@@ -23,7 +23,7 @@ DATABASE = "two_tdb_test"
 APP_PASSWORD = os.environ.get("TWO_TDB_APP_PASSWORD", "two_tdb_app")
 
 
-def embed(texts: list[str]) -> list[list[float]]:
+def embed(texts: Sequence[str]) -> list[list[float]]:
     """A stand-in for the model: texts sharing words are close."""
     vectors = []
     for text in texts:
@@ -76,10 +76,11 @@ def connect_app(database: str) -> Iterator[Callable[[], psycopg.Connection]]:
 @pytest.fixture
 def new_tenant(owner: psycopg.Connection) -> Callable[[], int]:
     def create() -> int:
-        return owner.execute(
+        [(tenant,)] = owner.execute(
             "INSERT INTO tenants (name) VALUES (%s) RETURNING id",
             [str(uuid.uuid4())],
-        ).fetchone()[0]
+        ).fetchall()
+        return tenant
 
     return create
 
@@ -134,8 +135,9 @@ def new_key(
 
     def create(tenant: int | None = None, *, writable: bool = True) -> str:
         tenant = new_tenant() if tenant is None else tenant
-        return owner.execute(
+        [(key,)] = owner.execute(
             "SELECT create_api_key(%s, %s)", [tenant, writable]
-        ).fetchone()[0]
+        ).fetchall()
+        return key
 
     return create

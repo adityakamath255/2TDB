@@ -23,7 +23,9 @@ build-backend = "uv_build"
 dev = [
     "anthropic>=2.14.0",
     "httpx2>=2.16.2",
+    "pyright>=1.1.414",
     "pytest>=9.2.0",
+    "ruff>=0.17.6",
 ]
 
 [tool.pytest.ini_options]
@@ -38,3 +40,6 @@ line-length = 79
 # ruff's default rule set leaves out E501, and the formatter can't split
 # strings or comments
 extend-select = ["E501"]
+
+[tool.pyright]
+include = ["src", "tests", "evaluation"]

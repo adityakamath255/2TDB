@@ -91,13 +91,13 @@ class Write:
     @classmethod
     def set(
         cls, key: str, value: Value, valid_from: datetime | None = None
-    ) -> "Write":
+    ) -> Write:
         if value is None:
             raise InvalidInput("use Write.delete to delete a key")
         return cls(key, value, valid_from)
 
     @classmethod
-    def delete(cls, key: str, valid_from: datetime | None = None) -> "Write":
+    def delete(cls, key: str, valid_from: datetime | None = None) -> Write:
         return cls(key, None, valid_from)
 
 

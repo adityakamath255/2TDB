@@ -4,6 +4,7 @@ from itertools import count
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from pydantic import Field
 
 from two_tdb import agent
 from two_tdb.agent import Message
@@ -16,7 +17,7 @@ class Scripted(BaseChatModel):
     """Replies with the given messages in turn and keeps what it was shown."""
 
     replies: list[AIMessage]
-    seen: list[list[BaseMessage]] = []
+    seen: list[list[BaseMessage]] = Field(default_factory=list)
 
     @property
     def _llm_type(self) -> str:
@@ -141,8 +142,10 @@ def test_store_errors_go_back_to_the_model(store):
     assert errors == [
         "error: 'shoe_size' is not a known attribute or note/<topic>",
         "error: seats takes a int, got 'twelve'",
-        "error: expected a datetime with a UTC offset, got "
-        "datetime.datetime(2026, 3, 5, 10, 0)",
+        (
+            "error: expected a datetime with a UTC offset, got "
+            "datetime.datetime(2026, 3, 5, 10, 0)"
+        ),
     ]
     assert store.is_empty()
     assert reply.text == "Sorry, I couldn't save that."

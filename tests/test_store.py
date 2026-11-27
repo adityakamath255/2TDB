@@ -1,5 +1,5 @@
-import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 import psycopg
@@ -367,22 +367,24 @@ def test_tenants_cannot_see_each_others_history(new_store, connect_app):
 
     # a transaction that names no tenant sees no rows at all
     app = connect_app()
-    assert app.execute("SELECT count(*) FROM changes").fetchone()[0] == 0
+    assert app.execute("SELECT count(*) FROM changes").fetchall() == [(0,)]
 
 
 def test_a_tenant_cannot_write_into_another(new_store, connect_app):
     a, b = new_store(), new_store()
     app = connect_app()
-    with pytest.raises(psycopg.errors.InsufficientPrivilege):
-        with app.transaction():
-            app.execute(
-                "SELECT set_config('app.tenant', %s, true)", [str(b.tenant)]
-            )
-            app.execute(
-                "INSERT INTO events (tenant, seq, committed_at, source)"
-                " VALUES (%s, 1, now(), 'x')",
-                [a.tenant],
-            )
+    with (
+        pytest.raises(psycopg.errors.InsufficientPrivilege),
+        app.transaction(),
+    ):
+        app.execute(
+            "SELECT set_config('app.tenant', %s, true)", [str(b.tenant)]
+        )
+        app.execute(
+            "INSERT INTO events (tenant, seq, committed_at, source)"
+            " VALUES (%s, 1, now(), 'x')",
+            [a.tenant],
+        )
 
 
 def test_the_app_cannot_rewrite_history(store, connect_app):
@@ -393,13 +395,15 @@ def test_the_app_cannot_rewrite_history(store, connect_app):
         "DELETE FROM changes",
         "DELETE FROM events",
     ):
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):
-            with app.transaction():
-                app.execute(
-                    "SELECT set_config('app.tenant', %s, true)",
-                    [str(store.tenant)],
-                )
-                app.execute(statement)
+        with (
+            pytest.raises(psycopg.errors.InsufficientPrivilege),
+            app.transaction(),
+        ):
+            app.execute(
+                "SELECT set_config('app.tenant', %s, true)",
+                [str(store.tenant)],
+            )
+            app.execute(statement)
     assert store.latest().get("x") == 1
 
 
@@ -415,24 +419,14 @@ def test_the_database_rejects_values_that_contradict_their_kind(store, owner):
 
 def test_concurrent_commits_number_events_in_commit_order(store, open_store):
     writers = [open_store(store.tenant) for _ in range(4)]
-    errors = []
 
     def write(writer: Store) -> None:
-        try:
-            for value in range(10):
-                commit(writer, Write.set("n", value))
-        except Exception as error:
-            errors.append(error)
+        for value in range(10):
+            commit(writer, Write.set("n", value))
 
-    threads = [
-        threading.Thread(target=write, args=[writer]) for writer in writers
-    ]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
+    with ThreadPoolExecutor(len(writers)) as pool:
+        list(pool.map(write, writers))
 
-    assert errors == []
     assert store.length() == 40
     stamps = [store.event(event_id).committed_at for event_id in range(1, 41)]
     assert stamps == sorted(stamps)
@@ -441,12 +435,12 @@ def test_concurrent_commits_number_events_in_commit_order(store, open_store):
 def test_commit_times_never_go_backwards(store, owner):
     # an event stamped an hour ahead stands in for a clock that later
     # steps back
-    ahead = owner.execute(
+    [(ahead,)] = owner.execute(
         "INSERT INTO events (tenant, seq, committed_at, source)"
         " VALUES (%s, 1, now() + interval '1 hour', 'test')"
         " RETURNING committed_at",
         [store.tenant],
-    ).fetchone()[0]
+    ).fetchall()
 
     commit(store, Write.set("x", 1))
 
@@ -497,18 +491,11 @@ def test_the_embedding_model_fits_the_schema(new_tenant, connect_app):
 
 def test_threads_can_share_a_store(store):
     commit(store, Write.set("x", 1))
-    failures = []
 
     def read() -> None:
-        try:
-            for _ in range(20):
-                assert store.latest().get("x") == 1
-        except Exception as error:
-            failures.append(error)
+        for _ in range(20):
+            assert store.latest().get("x") == 1
 
-    threads = [threading.Thread(target=read) for _ in range(4)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-    assert failures == []
+    with ThreadPoolExecutor(4) as pool:
+        for future in [pool.submit(read) for _ in range(4)]:
+            future.result()

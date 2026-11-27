@@ -21,9 +21,11 @@ def _at(text: str) -> datetime:
 _MESSAGES = [
     (
         "2026-01-10T10:00",
-        "Hi, I'm Asha Rao from Rao Textiles. "
-        "I just signed up and we're on the free plan for now. "
-        "I live in Mumbai.",
+        (
+            "Hi, I'm Asha Rao from Rao Textiles. "
+            "I just signed up and we're on the free plan for now. "
+            "I live in Mumbai."
+        ),
     ),
     (
         "2026-01-12T11:30",
@@ -37,28 +39,38 @@ _MESSAGES = [
     ("2026-02-20T12:00", "By the way, I'm the operations manager here."),
     (
         "2026-02-21T10:00",
-        "Could you fix my name in your records? "
-        "It's spelled Aasha, A-A-S-H-A.",
+        (
+            "Could you fix my name in your records? "
+            "It's spelled Aasha, A-A-S-H-A."
+        ),
     ),
     (
         "2026-02-22T18:45",
-        "I misspoke the other day: my title is head of operations, not "
-        "operations manager.",
+        (
+            "I misspoke the other day: my title is head of operations, not "
+            "operations manager."
+        ),
     ),
     (
         "2026-03-05T14:20",
-        "Our renewal date is 1 March 2027. "
-        "We haven't signed the contract yet, legal is still reviewing it.",
+        (
+            "Our renewal date is 1 March 2027. "
+            "We haven't signed the contract yet, legal is still reviewing it."
+        ),
     ),
     (
         "2026-03-18T09:40",
-        "I got the renewal date wrong earlier. "
-        "It's 1 April 2027, not 1 March.",
+        (
+            "I got the renewal date wrong earlier. "
+            "It's 1 April 2027, not 1 March."
+        ),
     ),
     (
         "2026-04-02T15:10",
-        "We moved the office to Pune at the end of March, and I live there "
-        "now too.",
+        (
+            "We moved the office to Pune at the end of March, and I live "
+            "there now too."
+        ),
     ),
     (
         "2026-04-15T11:00",
@@ -75,8 +87,10 @@ _MESSAGES = [
     ("2026-06-25T16:30", "Good news, I signed the contract today."),
     (
         "2026-07-08T11:45",
-        "Correction on the discount: it's 15%, not 10%. "
-        "The rep confirmed it was 15% from the start.",
+        (
+            "Correction on the discount: it's 15%, not 10%. "
+            "The rep confirmed it was 15% from the start."
+        ),
     ),
     ("2026-08-01T10:00", "We pay by card from this month."),
     (
@@ -140,14 +154,18 @@ _QUESTIONS: list[tuple[Kind, str, str]] = [
     ),
     (
         "current",
-        "Is the customer billed monthly or annually? "
-        "Answer monthly or annual.",
+        (
+            "Is the customer billed monthly or annually? "
+            "Answer monthly or annual."
+        ),
         "annual",
     ),
     (
         "current",
-        "What discount does the customer get, in percent? "
-        "Answer with a number.",
+        (
+            "What discount does the customer get, in percent? "
+            "Answer with a number."
+        ),
         "15",
     ),
     (
@@ -167,74 +185,98 @@ _QUESTIONS: list[tuple[Kind, str, str]] = [
     ("past", "Which plan was the customer on on 2026-09-20?", "pro"),
     (
         "past",
-        "How many seats did the customer pay for on 2026-04-01? "
-        "Answer with a number.",
+        (
+            "How many seats did the customer pay for on 2026-04-01? "
+            "Answer with a number."
+        ),
         "5",
     ),
     (
         "past",
-        "Was the customer billed monthly or annually on 2026-05-20? "
-        "Answer monthly or annual.",
+        (
+            "Was the customer billed monthly or annually on 2026-05-20? "
+            "Answer monthly or annual."
+        ),
         "monthly",
     ),
     (
         "past",
-        "Which channel did the customer prefer to be contacted on on "
-        "2026-03-01?",
+        (
+            "Which channel did the customer prefer to be contacted on on "
+            "2026-03-01?"
+        ),
         "email",
     ),
     (
         "past",
-        "Had the customer signed the contract as of 2026-06-01? "
-        "Answer yes or no.",
+        (
+            "Had the customer signed the contract as of 2026-06-01? "
+            "Answer yes or no."
+        ),
         "no",
     ),
     (
         "corrected",
-        "Before the customer corrected it, what renewal date did we have on "
-        "file? Answer as YYYY-MM-DD.",
+        (
+            "Before the customer corrected it, what renewal date did we have "
+            "on file? Answer as YYYY-MM-DD."
+        ),
         "2027-03-01",
     ),
     (
         "corrected",
-        "Before the customer corrected it, what discount did we have on file, "
-        "in percent? Answer with a number.",
+        (
+            "Before the customer corrected it, what discount did we have on "
+            "file, in percent? Answer with a number."
+        ),
         "10",
     ),
     (
         "corrected",
-        "Before the customer corrected it, what phone number did we have on "
-        "file?",
+        (
+            "Before the customer corrected it, what phone number did we have "
+            "on file?"
+        ),
         "+91 98450 12345",
     ),
     (
         "corrected",
-        "Before the customer corrected it, how many seats did we have on file "
-        "for April? Answer with a number.",
+        (
+            "Before the customer corrected it, how many seats did we have on "
+            "file for April? Answer with a number."
+        ),
         "12",
     ),
     (
         "corrected",
-        "Before the customer corrected it, how was the customer's name "
-        "spelled in our records?",
+        (
+            "Before the customer corrected it, how was the customer's name "
+            "spelled in our records?"
+        ),
         "Asha Rao",
     ),
     (
         "corrected",
-        "Before the customer corrected it, what email address did we have on "
-        "file?",
+        (
+            "Before the customer corrected it, what email address did we have "
+            "on file?"
+        ),
         "asha.rao@example.com",
     ),
     (
         "corrected",
-        "Before the customer corrected it, what job title did we have on "
-        "file?",
+        (
+            "Before the customer corrected it, what job title did we have on "
+            "file?"
+        ),
         "operations manager",
     ),
     (
         "corrected",
-        "Before the customer corrected it, what payment method did we have on "
-        "file?",
+        (
+            "Before the customer corrected it, what payment method did we "
+            "have on file?"
+        ),
         "card",
     ),
 ]
