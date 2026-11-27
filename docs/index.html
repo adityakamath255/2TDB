@@ -235,6 +235,27 @@
     .plane .now-label {
       fill: var(--accent);
     }
+    .plane .sent {
+      stroke: var(--mark);
+      stroke-width: 2;
+    }
+    figcaption {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      margin: 8px 0 4px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    figcaption svg {
+      flex: none;
+      align-self: flex-start;
+      margin-top: 0.3em;
+    }
+    figcaption line {
+      stroke: var(--mark);
+      stroke-width: 2;
+    }
 
     .answer {
       margin-top: 24px;
@@ -454,6 +475,16 @@
           <figure>
             <svg class="plane" id="plane" tabindex="0" role="img"
               aria-describedby="answer-text"></svg>
+            <figcaption>
+              <svg width="6" height="14" aria-hidden="true">
+                <line x1="3" x2="3" y1="0" y2="14" />
+              </svg>
+              <span>Each row's mark is when the customer sent the message that
+                started it. A value beginning left of its mark was reported
+                late (back-dated); one beginning right of it was announced
+                ahead (scheduled). Commit times are when the demo was seeded,
+                so the chart shows message dates instead.</span>
+            </figcaption>
           </figure>
 
           <div class="answer">
@@ -528,6 +559,12 @@
         day: "numeric",
         month: "short",
         year: "numeric",
+        timeZone: "UTC",
+      });
+    const fmtDay = (ms) =>
+      new Date(ms).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
         timeZone: "UTC",
       });
     const iso = (ms) => new Date(ms).toISOString().replace(".000Z", "Z");
@@ -646,15 +683,32 @@
         svg.append(
           el("line", { class: "axis", x1: L, x2: W - R, y1: y2, y2: y2 }),
         );
+        const starter = history.find((a) => a.event_id === row.from);
+        const message = starter && state.messages[starter.source];
+        const mid = (y1 + y2) / 2;
         svg.append(
           el(
             "text",
-            { x: L - 8, y: (y1 + y2) / 2 + 4, "text-anchor": "end" },
+            { x: L - 8, y: message ? mid - 2 : mid + 4, "text-anchor": "end" },
             row.to > row.from
               ? `events ${row.from}–${row.to}`
               : `event ${row.from}`,
           ),
         );
+        if (message) {
+          const sent = Date.parse(message.sent_at);
+          svg.append(
+            el(
+              "text",
+              { x: L - 8, y: mid + 12, "text-anchor": "end" },
+              `sent ${fmtDay(sent)}`,
+            ),
+          );
+          const x = xOf(sent);
+          svg.append(
+            el("line", { class: "sent", x1: x, x2: x, y1: y1 + 4, y2: mid }),
+          );
+        }
       });
 
       if (Date.now() < X1) {
