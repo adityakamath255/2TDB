@@ -59,7 +59,7 @@ A snapshot fixes both axes: which events count (all of them, the first N, or tho
 
 ## API
 
-Reads take a snapshot as query parameters: `event` or `known_at` for the transaction axis (default: the latest event), and `valid_at` for the valid axis (default: the time the snapshot was taken). Timestamps must carry a UTC offset, and unknown parameters are rejected.
+Reads take a snapshot as query parameters: `event` or `known_at` for the transaction axis (default: the latest event), and `valid_at` for the valid axis (default: the commit time of the chosen event, the `known_at` time, or now for the latest event). Timestamps must carry a UTC offset, and unknown parameters are rejected.
 
 | Endpoint | Returns |
 |---|---|

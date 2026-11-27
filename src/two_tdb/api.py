@@ -31,7 +31,9 @@ from two_tdb.store import Embed, Reader, Snapshot, Store
 
 class At(BaseModel, extra="forbid"):
     """A snapshot: the latest event, or the one named by event or known_at,
-    read at valid_at (default: the time the snapshot was taken)."""
+    read at valid_at (default: that event's commit time, known_at, or now
+    for the latest event).
+    """
 
     event: int | None = None
     known_at: AwareDatetime | None = None
