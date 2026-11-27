@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg_pool import ConnectionPool, PoolTimeout
@@ -215,8 +216,13 @@ def _store(reader: Annotated[Reader, Depends(_reader)]) -> Store:
 type ReaderDep = Annotated[Reader, Depends(_reader)]
 
 
-def create_app(conninfo: str, embed: Embed) -> FastAPI:
-    """Returns the HTTP API; conninfo must log in as two_tdb_app."""
+def create_app(
+    conninfo: str, embed: Embed, cors_origin: str | None = None
+) -> FastAPI:
+    """Returns the HTTP API; conninfo must log in as two_tdb_app.
+
+    A page served from cors_origin may read through the API from a browser.
+    """
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -233,6 +239,13 @@ def create_app(conninfo: str, embed: Embed) -> FastAPI:
         summary="A bitemporal key-value store.",
         lifespan=lifespan,
     )
+    if cors_origin:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=[cors_origin],
+            allow_methods=["GET"],
+            allow_headers=["Authorization"],
+        )
 
     @app.exception_handler(InvalidInput)
     @app.exception_handler(EmptyCommit)
@@ -334,5 +347,12 @@ def create_app(conninfo: str, embed: Embed) -> FastAPI:
 
 
 def from_environment() -> FastAPI:
-    """The app for `uvicorn --factory`, connecting to TWO_TDB_DATABASE_URL."""
-    return create_app(os.environ["TWO_TDB_DATABASE_URL"], Embedder())
+    """The app for `uvicorn --factory`, connecting to TWO_TDB_DATABASE_URL.
+
+    TWO_TDB_CORS_ORIGIN, if set, names the one origin whose pages may read.
+    """
+    return create_app(
+        os.environ["TWO_TDB_DATABASE_URL"],
+        Embedder(),
+        os.environ.get("TWO_TDB_CORS_ORIGIN"),
+    )

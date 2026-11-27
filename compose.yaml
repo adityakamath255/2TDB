@@ -24,6 +24,7 @@ services:
     restart: unless-stopped
     environment:
       TWO_TDB_DATABASE_URL: postgresql://two_tdb_app:${TWO_TDB_APP_PASSWORD:-two_tdb_app}@db/two_tdb
+      TWO_TDB_CORS_ORIGIN: ${TWO_TDB_CORS_ORIGIN:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

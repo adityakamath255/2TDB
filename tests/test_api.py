@@ -1,5 +1,8 @@
 import psycopg
 import pytest
+from fastapi.testclient import TestClient
+
+from two_tdb.api import create_app
 
 
 def auth(key: str) -> dict[str, str]:
@@ -211,3 +214,25 @@ def test_search_returns_facts_closest_first(app, new_key):
         ).status_code
         == 422
     )
+
+
+def test_only_the_configured_origin_may_read_from_a_browser():
+    # preflight requests never reach the database, so none is configured
+    client = TestClient(
+        create_app(
+            "", embed=lambda texts: [], cors_origin="https://example.org"
+        )
+    )
+    for origin, allowed in [
+        ("https://example.org", "https://example.org"),
+        ("https://other.example", None),
+    ]:
+        response = client.options(
+            "/keys",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization",
+            },
+        )
+        assert response.headers.get("access-control-allow-origin") == allowed
