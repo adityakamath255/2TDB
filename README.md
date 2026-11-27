@@ -6,7 +6,7 @@ The earlier Rust library, an embedded store on SQLite, is on the [`rust`](https:
 
 ## Demo
 
-A read-only copy runs at https://2tdb.duckdns.org. It holds the evaluation's customer: the agent read the 26 scenario messages and recorded 24 events, including corrected details and a back-dated move. The page at https://adityakamath255.github.io/2TDB/ charts each key over valid time and events, and queries the API at the point you pick. To call the API yourself, open https://2tdb.duckdns.org/docs, choose Authorize and paste the key below, or use curl:
+A read-only copy runs at https://2tdb.duckdns.org. It holds the evaluation's customer: the agent read the 26 scenario messages and recorded 24 events, including corrected details and a back-dated move. The page at https://adityakamath255.github.io/2TDB/ charts each key over valid time and events, and queries the API at the point you pick. To call the API yourself, open https://2tdb.duckdns.org/docs, choose Authorize and paste the key below, or use curl. The key is public on purpose: it reads only the demo tenant and can't commit.
 
 ```sh
 KEY=2tdb_6a596f0e533c047d5e5828f6de4c398934073dd02a8c2f84ee7851a603b21f10
@@ -15,7 +15,7 @@ curl -H "Authorization: Bearer $KEY" "https://2tdb.duckdns.org/history?key=email
 curl -H "Authorization: Bearer $KEY" "https://2tdb.duckdns.org/value?key=city&valid_at=2026-03-01T00:00:00Z"
 ```
 
-The key reads only the demo tenant and can't commit. Valid times follow the messages' dates; commit times are when the seed ran, on 27 November 2026.
+Valid times follow the messages' dates; commit times are when the seed ran, on 27 November 2026.
 
 ## Usage
 
