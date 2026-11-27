@@ -1,0 +1,36 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:0.8.7-pg18-trixie
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --host localhost --username postgres"
+          --health-interval 2s
+          --health-retries 15
+    env:
+      FASTEMBED_CACHE_PATH: ${{ github.workspace }}/../fastembed
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: uv sync --locked
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # one test loads the embedding model, which downloads on first use
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.FASTEMBED_CACHE_PATH }}
+          key: fastembed-${{ hashFiles('src/two_tdb/embedding.py') }}
+      - run: uv run pytest
