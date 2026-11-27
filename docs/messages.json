@@ -1,0 +1,106 @@
+{
+ "msg-01": {
+  "sent_at": "2026-01-10T10:00:00+05:30",
+  "text": "Hi, I'm Asha Rao from Rao Textiles. I just signed up and we're on the free plan for now. I live in Mumbai."
+ },
+ "msg-02": {
+  "sent_at": "2026-01-12T11:30:00+05:30",
+  "text": "Best way to reach me is email: asha.rao@example.com"
+ },
+ "msg-03": {
+  "sent_at": "2026-01-13T09:15:00+05:30",
+  "text": "Sorry, typo in my email. It's asha.rao@example.in"
+ },
+ "msg-04": {
+  "sent_at": "2026-02-03T16:00:00+05:30",
+  "text": "We upgraded to the pro plan today, with 5 seats, billed monthly."
+ },
+ "msg-05": {
+  "sent_at": "2026-02-20T12:00:00+05:30",
+  "text": "By the way, I'm the operations manager here."
+ },
+ "msg-06": {
+  "sent_at": "2026-02-21T10:00:00+05:30",
+  "text": "Could you fix my name in your records? It's spelled Aasha, A-A-S-H-A."
+ },
+ "msg-07": {
+  "sent_at": "2026-02-22T18:45:00+05:30",
+  "text": "I misspoke the other day: my title is head of operations, not operations manager."
+ },
+ "msg-08": {
+  "sent_at": "2026-03-05T14:20:00+05:30",
+  "text": "Our renewal date is 1 March 2027. We haven't signed the contract yet, legal is still reviewing it."
+ },
+ "msg-09": {
+  "sent_at": "2026-03-18T09:40:00+05:30",
+  "text": "I got the renewal date wrong earlier. It's 1 April 2027, not 1 March."
+ },
+ "msg-10": {
+  "sent_at": "2026-04-02T15:10:00+05:30",
+  "text": "We moved the office to Pune at the end of March, and I live there now too."
+ },
+ "msg-11": {
+  "sent_at": "2026-04-15T11:00:00+05:30",
+  "text": "We added 7 more seats this week, so we have 12 now."
+ },
+ "msg-12": {
+  "sent_at": "2026-04-17T10:30:00+05:30",
+  "text": "Small fix: we have 11 seats in total, not 12."
+ },
+ "msg-13": {
+  "sent_at": "2026-05-06T13:00:00+05:30",
+  "text": "Please switch us to annual billing from 1 June."
+ },
+ "msg-14": {
+  "sent_at": "2026-05-14T17:25:00+05:30",
+  "text": "Is there a dark mode in the dashboard?"
+ },
+ "msg-15": {
+  "sent_at": "2026-05-22T12:10:00+05:30",
+  "text": "Your sales rep agreed a 10% discount for us."
+ },
+ "msg-16": {
+  "sent_at": "2026-06-10T09:05:00+05:30",
+  "text": "WhatsApp is easier for me than email now, please use that."
+ },
+ "msg-17": {
+  "sent_at": "2026-06-25T16:30:00+05:30",
+  "text": "Good news, I signed the contract today."
+ },
+ "msg-18": {
+  "sent_at": "2026-07-08T11:45:00+05:30",
+  "text": "Correction on the discount: it's 15%, not 10%. The rep confirmed it was 15% from the start."
+ },
+ "msg-19": {
+  "sent_at": "2026-08-01T10:00:00+05:30",
+  "text": "We pay by card from this month."
+ },
+ "msg-20": {
+  "sent_at": "2026-08-03T10:20:00+05:30",
+  "text": "Sorry, I meant UPI, not card. We pay by UPI from this month."
+ },
+ "msg-21": {
+  "sent_at": "2026-09-14T15:00:00+05:30",
+  "text": "Big news: we're moving to the enterprise plan on 1 October."
+ },
+ "msg-22": {
+  "sent_at": "2026-09-30T12:40:00+05:30",
+  "text": "Could you send invoices in Marathi? I prefer Marathi for documents."
+ },
+ "msg-23": {
+  "sent_at": "2026-10-12T10:15:00+05:30",
+  "text": "My new phone number is +91 98450 12345."
+ },
+ "msg-24": {
+  "sent_at": "2026-10-20T14:00:00+05:30",
+  "text": "Also, we relocated again, to Bengaluru, two weeks ago."
+ },
+ "msg-25": {
+  "sent_at": "2026-10-25T09:30:00+05:30",
+  "text": "The phone number I gave was wrong. It's +91 98450 54321."
+ },
+ "msg-26": {
+  "sent_at": "2026-10-28T17:00:00+05:30",
+  "text": "Thanks for all the help this year!"
+ }
+}
