@@ -12,6 +12,9 @@ from typing import Any, Literal
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
     AgentMiddleware,
+    AgentState,
+    InputAgentState,
+    OutputAgentState,
     ToolCallLimitMiddleware,
     ToolErrorMiddleware,
 )
@@ -19,6 +22,7 @@ from langchain.tools import ToolRuntime, tool
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
+from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel
 
 from two_tdb.model import (
@@ -214,7 +218,12 @@ def chat_model() -> ChatAnthropic:
     return ChatAnthropic(model=MODEL, max_tokens=4096)  # pyright: ignore[reportCallIssue]
 
 
-def build(model: BaseChatModel):
+type Agent = CompiledStateGraph[
+    AgentState[Any], Context, InputAgentState, OutputAgentState[Any]
+]
+
+
+def build(model: BaseChatModel) -> Agent:
     """Returns the agent graph, to run with respond."""
     middleware: list[AgentMiddleware[Any, Context]] = [
         ToolErrorMiddleware(on_error=_store_error),
@@ -247,7 +256,7 @@ class Reply:
     tool_calls: int
 
 
-def respond(agent, store: Store, message: Message) -> Reply:
+def respond(agent: Agent, store: Store, message: Message) -> Reply:
     """Runs the agent on one message against store, committing with the
     message's ID as source.
     """
