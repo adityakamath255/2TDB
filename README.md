@@ -141,5 +141,6 @@ CI runs the same tests on pushes to `main` and on pull requests, after `uv run r
 - Commits have no idempotency keys. A client that retries a commit after a timeout may record it twice; reads are unchanged unless another commit to the same key landed in between.
 - One tenant's commits run one at a time, so a stuck writer holds up that tenant until it times out.
 - The evaluation is one scripted customer and 24 questions. Its baseline retrieves five messages; with this few messages, putting all of them in the prompt would be a stronger baseline.
+- The evaluation asks about the transaction axis only relative to a correction ("before the customer corrected it"), never as of a date: the agent's tools see each fact's source message but not when it arrived, and commit times are when the evaluation ran.
 - The agent's facts come from a fixed attribute list; anything else goes into free-text notes.
 - The demo is one small VM with no backups and no rate limit, so anyone with the public key can read the demo tenant as often as they like.
