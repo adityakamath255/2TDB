@@ -328,18 +328,27 @@ class Snapshot:
     def valid_unbounded(self) -> Snapshot:
         return replace(self, valid_through=None)
 
+    def _winner(self, key: Template) -> Template:
+        """The assertion deciding the key here, deletions included, as a
+        query on changes; key is an SQL expression.
+        """
+        return t"""
+            SELECT * FROM changes
+            WHERE key = {key:q}
+              AND valid <= coalesce(
+                  {self.valid_through}::timestamptz, 'infinity'
+              )
+              AND seq <= coalesce({self.event_id}::bigint, 0)
+            ORDER BY valid DESC, seq DESC
+            LIMIT 1
+        """
+
     def get(self, key: str) -> Value | None:
+        winner = self._winner(t"{key}")
         with self.reader._transaction() as db:
             row = db.execute(t"""
                 SELECT kind, bool_value, int_value, float_value, str_value
-                FROM changes
-                WHERE key = {key}
-                  AND valid <= coalesce(
-                      {self.valid_through}::timestamptz, 'infinity'
-                  )
-                  AND seq <= coalesce({self.event_id}::bigint, 0)
-                ORDER BY valid DESC, seq DESC
-                LIMIT 1
+                FROM ({winner:q}) AS w
             """).fetchone()
         return None if row is None else _decode(row)
 
@@ -347,19 +356,13 @@ class Snapshot:
         """Returns the assertion that decides get(key), including a
         deletion.
         """
+        winner = self._winner(t"{key}")
         with self.reader._transaction() as db:
             row = db.execute(t"""
-                SELECT c.key, c.valid, c.seq, e.committed_at, e.source,
-                       c.kind, c.bool_value, c.int_value, c.float_value,
-                       c.str_value
-                FROM changes c JOIN events e USING (tenant, seq)
-                WHERE c.key = {key}
-                  AND c.valid <= coalesce(
-                      {self.valid_through}::timestamptz, 'infinity'
-                  )
-                  AND c.seq <= coalesce({self.event_id}::bigint, 0)
-                ORDER BY c.valid DESC, c.seq DESC
-                LIMIT 1
+                SELECT w.key, w.valid, w.seq, e.committed_at, e.source,
+                       w.kind, w.bool_value, w.int_value, w.float_value,
+                       w.str_value
+                FROM ({winner:q}) AS w JOIN events e USING (tenant, seq)
             """).fetchone()
         return None if row is None else _recorded(row)
 
@@ -369,16 +372,7 @@ class Snapshot:
             {_KEYS:q}
             SELECT w.key, w.kind, w.bool_value, w.int_value, w.float_value,
                    w.str_value, w.embedding
-            FROM keys CROSS JOIN LATERAL (
-                SELECT * FROM changes
-                WHERE key = keys.key
-                  AND valid <= coalesce(
-                      {self.valid_through}::timestamptz, 'infinity'
-                  )
-                  AND seq <= coalesce({self.event_id}::bigint, 0)
-                ORDER BY valid DESC, seq DESC
-                LIMIT 1
-            ) AS w
+            FROM keys CROSS JOIN LATERAL ({self._winner(t"keys.key"):q}) AS w
         """
 
     def state(self) -> dict[str, Value]:
