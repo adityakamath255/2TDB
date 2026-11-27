@@ -1,488 +1,920 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>2TDB demo</title>
-<meta name="description" content="A bitemporal key-value store holding one customer's memory as a support agent recorded it. Pick a point in valid time and event time and query the live API.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root {
-  --bg: #f7f7f4;
-  --surface: #ffffff;
-  --text: #1c1d1f;
-  --muted: #5b5e64;
-  --line: #d9dad5;
-  --grid: #ebebe6;
-  --accent: #2456c7;
-  --accent-soft: #e4ebfa;
-  --mark: #1c1d1f;
-  --v0: #c9d8f5; --v1: #f3dcae; --v2: #dccff0; --v3: #bfe3df; --v4: #f2cfd9;
-  --code-bg: #f0f0eb;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141517;
-    --surface: #1c1d20;
-    --text: #e8e8e4;
-    --muted: #a2a5ab;
-    --line: #34363b;
-    --grid: #26282c;
-    --accent: #8fb0f5;
-    --accent-soft: #24304a;
-    --mark: #f2f2ee;
-    --v0: #2b4170; --v1: #5e4a22; --v2: #47396a; --v3: #24504c; --v4: #5c3341;
-    --code-bg: #232428;
-    color-scheme: dark;
-  }
-}
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font: 400 15px/1.55 "IBM Plex Sans", system-ui, sans-serif;
-}
-::selection { background: var(--accent-soft); color: var(--text); }
-a { color: var(--accent); text-underline-offset: 0.18em; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
-code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.92em; }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 64px; }
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2TDB demo</title>
+    <meta name="description"
+      content="A bitemporal key-value store holding one customer's memory as a support agent recorded it. Pick a point in valid time and event time and query the live API.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet">
+    <style>
+    :root {
+      --bg: #f7f7f4;
+      --surface: #ffffff;
+      --text: #1c1d1f;
+      --muted: #5b5e64;
+      --line: #d9dad5;
+      --grid: #ebebe6;
+      --accent: #2456c7;
+      --accent-soft: #e4ebfa;
+      --mark: #1c1d1f;
+      --v0: #c9d8f5;
+      --v1: #f3dcae;
+      --v2: #dccff0;
+      --v3: #bfe3df;
+      --v4: #f2cfd9;
+      --code-bg: #f0f0eb;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #141517;
+        --surface: #1c1d20;
+        --text: #e8e8e4;
+        --muted: #a2a5ab;
+        --line: #34363b;
+        --grid: #26282c;
+        --accent: #8fb0f5;
+        --accent-soft: #24304a;
+        --mark: #f2f2ee;
+        --v0: #2b4170;
+        --v1: #5e4a22;
+        --v2: #47396a;
+        --v3: #24504c;
+        --v4: #5c3341;
+        --code-bg: #232428;
+        color-scheme: dark;
+      }
+    }
+    * {
+      box-sizing: border-box;
+    }
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 400 15px/1.55 "IBM Plex Sans", system-ui, sans-serif;
+    }
+    ::selection {
+      background: var(--accent-soft);
+      color: var(--text);
+    }
+    a {
+      color: var(--accent);
+      text-underline-offset: 0.18em;
+    }
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+    code,
+    .mono {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      font-size: 0.92em;
+    }
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 40px 24px 64px;
+    }
 
-header { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: baseline; justify-content: space-between; }
-h1 { margin: 0; font-size: 1.75rem; font-weight: 600; letter-spacing: -0.01em; }
-header nav { display: flex; gap: 20px; font-size: 0.93rem; }
-.lede { max-width: 70ch; margin: 14px 0 0; color: var(--muted); }
-.lede strong { color: var(--text); font-weight: 500; }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 32px;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    header nav {
+      display: flex;
+      gap: 20px;
+      font-size: 0.93rem;
+    }
+    .lede {
+      max-width: 70ch;
+      margin: 14px 0 0;
+      color: var(--muted);
+    }
+    .lede strong {
+      color: var(--text);
+      font-weight: 500;
+    }
 
-.layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; margin-top: 36px; }
-h2 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 0 10px; }
+    .layout {
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: 32px;
+      margin-top: 36px;
+    }
+    h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 10px;
+    }
 
-.keys { list-style: none; margin: 0; padding: 0; }
-.keys button {
-  all: unset; box-sizing: border-box; display: flex; width: 100%; justify-content: space-between; gap: 8px;
-  padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.92rem;
-}
-.keys button:hover { background: var(--grid); }
-.keys button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); font-weight: 500; }
-.keys button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.keys .tag { color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+    .keys {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .keys button {
+      all: unset;
+      box-sizing: border-box;
+      display: flex;
+      width: 100%;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.92rem;
+    }
+    .keys button:hover {
+      background: var(--grid);
+    }
+    .keys button[aria-pressed="true"] {
+      background: var(--accent-soft);
+      color: var(--text);
+      font-weight: 500;
+    }
+    .keys button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+    .keys .tag {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 400;
+    }
 
-.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; align-items: baseline; }
-.chart-head h2 { margin: 0; }
-.hint { color: var(--muted); font-size: 0.85rem; margin: 0; }
-figure { margin: 10px 0 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 12px 6px; }
-svg.plane { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: manipulation; }
-svg.plane:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-.plane text { font-family: "IBM Plex Mono", monospace; font-size: 11px; fill: var(--muted); }
-.plane .seg text { fill: var(--text); font-size: 12px; }
-.plane .gridline { stroke: var(--grid); }
-.plane .axis { stroke: var(--line); }
-.plane .seg rect { stroke: var(--surface); stroke-width: 1; }
-.plane .cross { stroke: var(--mark); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
-.plane .dot { fill: var(--mark); stroke: var(--surface); stroke-width: 2; pointer-events: none; }
-.plane .now { stroke: var(--accent); stroke-width: 1; }
-.plane .now-label { fill: var(--accent); }
+    .chart-head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 4px 16px;
+      align-items: baseline;
+    }
+    .chart-head h2 {
+      margin: 0;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin: 0;
+    }
+    figure {
+      margin: 10px 0 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px 12px 6px;
+    }
+    svg.plane {
+      display: block;
+      width: 100%;
+      height: auto;
+      cursor: crosshair;
+      touch-action: manipulation;
+    }
+    svg.plane:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 4px;
+    }
+    .plane text {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      fill: var(--muted);
+    }
+    .plane .seg text {
+      fill: var(--text);
+      font-size: 12px;
+    }
+    .plane .gridline {
+      stroke: var(--grid);
+    }
+    .plane .axis {
+      stroke: var(--line);
+    }
+    .plane .seg rect {
+      stroke: var(--surface);
+      stroke-width: 1;
+    }
+    .plane .cross {
+      stroke: var(--mark);
+      stroke-width: 1;
+      stroke-dasharray: 3 3;
+      pointer-events: none;
+    }
+    .plane .dot {
+      fill: var(--mark);
+      stroke: var(--surface);
+      stroke-width: 2;
+      pointer-events: none;
+    }
+    .plane .now {
+      stroke: var(--accent);
+      stroke-width: 1;
+    }
+    .plane .now-label {
+      fill: var(--accent);
+    }
 
-.answer { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; min-width: 0; }
-.request { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
-.request code { overflow-wrap: anywhere; line-height: 1.5; }
-.request .verb { font-weight: 500; color: var(--accent); }
-button.copy {
-  font: 500 0.82rem "IBM Plex Sans", sans-serif; color: var(--text); background: var(--bg);
-  border: 1px solid var(--line); border-radius: 5px; padding: 4px 10px; cursor: pointer; white-space: nowrap;
-}
-button.copy:hover { border-color: var(--muted); }
-.value { font-family: "IBM Plex Mono", monospace; font-size: 1.5rem; font-weight: 500; margin: 14px 0 4px; word-break: break-word; }
-.value.long { font: 400 1.05rem/1.5 "IBM Plex Sans", sans-serif; }
-.value.none { color: var(--muted); font-size: 1.1rem; font-weight: 400; }
-.answer .panel.stale #answer-text { opacity: 0.45; }
-.because { color: var(--muted); margin: 0; font-size: 0.92rem; }
-blockquote { margin: 12px 0 0; padding: 10px 14px; background: var(--code-bg); border-radius: 6px; font-size: 0.93rem; }
-blockquote footer { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
-details { margin-top: 14px; }
-summary { cursor: pointer; color: var(--muted); font-size: 0.88rem; }
-pre { margin: 8px 0 0; padding: 12px; background: var(--code-bg); border-radius: 6px; overflow-x: auto; font: 0.8rem/1.5 "IBM Plex Mono", monospace; }
+    .answer {
+      margin-top: 24px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 24px;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px 18px;
+      min-width: 0;
+    }
+    .request {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .request code {
+      overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
+    .request .verb {
+      font-weight: 500;
+      color: var(--accent);
+    }
+    button.copy {
+      font: 500 0.82rem "IBM Plex Sans", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 4px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button.copy:hover {
+      border-color: var(--muted);
+    }
+    .value {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 1.5rem;
+      font-weight: 500;
+      margin: 14px 0 4px;
+      word-break: break-word;
+    }
+    .value.long {
+      font: 400 1.05rem/1.5 "IBM Plex Sans", sans-serif;
+    }
+    .value.none {
+      color: var(--muted);
+      font-size: 1.1rem;
+      font-weight: 400;
+    }
+    .answer .panel.stale #answer-text {
+      opacity: 0.45;
+    }
+    .because {
+      color: var(--muted);
+      margin: 0;
+      font-size: 0.92rem;
+    }
+    blockquote {
+      margin: 12px 0 0;
+      padding: 10px 14px;
+      background: var(--code-bg);
+      border-radius: 6px;
+      font-size: 0.93rem;
+    }
+    blockquote footer {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+    details {
+      margin-top: 14px;
+    }
+    summary {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    pre {
+      margin: 8px 0 0;
+      padding: 12px;
+      background: var(--code-bg);
+      border-radius: 6px;
+      overflow-x: auto;
+      font: 0.8rem/1.5 "IBM Plex Mono", monospace;
+    }
 
-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
-th { text-align: left; font-weight: 500; color: var(--muted); padding: 0 8px 6px 0; border-bottom: 1px solid var(--line); }
-td { padding: 7px 8px 7px 0; border-bottom: 1px solid var(--grid); vertical-align: top; }
-td.mono { white-space: nowrap; }
-tr.decides td { background: var(--accent-soft); }
-tr.decides td:first-child { border-radius: 4px 0 0 4px; padding-left: 6px; }
-tr.decides td:last-child { border-radius: 0 4px 4px 0; }
-.status { font-size: 0.8rem; color: var(--muted); }
-tr.decides .status { color: var(--text); font-weight: 500; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      font-variant-numeric: tabular-nums;
+    }
+    th {
+      text-align: left;
+      font-weight: 500;
+      color: var(--muted);
+      padding: 0 8px 6px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    td {
+      padding: 7px 8px 7px 0;
+      border-bottom: 1px solid var(--grid);
+      vertical-align: top;
+    }
+    td.mono {
+      white-space: nowrap;
+    }
+    tr.decides td {
+      background: var(--accent-soft);
+    }
+    tr.decides td:first-child {
+      border-radius: 4px 0 0 4px;
+      padding-left: 6px;
+    }
+    tr.decides td:last-child {
+      border-radius: 0 4px 4px 0;
+    }
+    .status {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    tr.decides .status {
+      color: var(--text);
+      font-weight: 500;
+    }
 
-.error { margin-top: 24px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
-.loading { color: var(--muted); }
-.foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.86rem; max-width: 80ch; }
-.foot p { margin: 0 0 6px; }
+    .error {
+      margin-top: 24px;
+      padding: 14px 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+    .loading {
+      color: var(--muted);
+    }
+    .foot {
+      margin-top: 48px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.86rem;
+      max-width: 80ch;
+    }
+    .foot p {
+      margin: 0 0 6px;
+    }
 
-@media (max-width: 860px) {
-  .layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .keys { display: flex; flex-wrap: wrap; gap: 4px; }
-  .keys button { width: auto; border: 1px solid var(--line); }
-  .keys .tag { display: none; }
-  .answer { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 520px) {
-  .wrap { padding: 24px 16px 48px; }
-  .request { flex-direction: column; }
-}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <h1>2TDB</h1>
-    <nav>
-      <a href="https://github.com/adityakamath255/2TDB">Source on GitHub</a>
-      <a href="https://2tdb.duckdns.org/docs">API reference</a>
-    </nav>
-  </header>
-  <p class="lede">
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 20px;
+      }
+      .keys {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .keys button {
+        width: auto;
+        border: 1px solid var(--line);
+      }
+      .keys .tag {
+        display: none;
+      }
+      .answer {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    @media (max-width: 520px) {
+      .wrap {
+        padding: 24px 16px 48px;
+      }
+      .request {
+        flex-direction: column;
+      }
+    }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>2TDB</h1>
+        <nav>
+          <a
+            href="https://github.com/adityakamath255/2TDB">Source on GitHub</a>
+          <a href="https://2tdb.duckdns.org/docs">API reference</a>
+        </nav>
+      </header>
+      <p class="lede">
     2TDB is a bitemporal key-value store. Below is the memory a support agent on Claude Haiku built from one customer's 26 messages, January to October 2026.
     Each fact has two times: <strong>when it was true</strong> (across) and <strong>which event recorded it</strong> (up). A correction adds a band above and leaves the old answer below it, so you can ask both what was true on a date and what the store believed after any message.
     Click the chart to query the live API at that point.
   </p>
 
-  <div class="layout">
-    <section aria-labelledby="keys-h">
-      <h2 id="keys-h">Keys</h2>
-      <ul class="keys" id="keys"><li class="loading">Loading…</li></ul>
-    </section>
+      <div class="layout">
+        <section aria-labelledby="keys-h">
+          <h2 id="keys-h">Keys</h2>
+          <ul class="keys" id="keys">
+            <li class="loading">Loading…</li>
+          </ul>
+        </section>
 
-    <section aria-labelledby="chart-h" id="main">
-      <div class="chart-head">
-        <h2 id="chart-h">Value of <code id="key-name">…</code></h2>
-        <p class="hint">Click the chart to pick a point; then ← → move it a week and ↑ ↓ one event.</p>
-      </div>
-      <figure>
-        <svg class="plane" id="plane" tabindex="0" role="img" aria-describedby="answer-text"></svg>
-      </figure>
-
-      <div class="answer">
-        <div class="panel" id="answer-panel" aria-live="polite">
-          <div class="request">
-            <code id="request"></code>
-            <button class="copy" id="copy" type="button">Copy as curl</button>
+        <section aria-labelledby="chart-h" id="main">
+          <div class="chart-head">
+            <h2 id="chart-h">Value of <code id="key-name">…</code></h2>
+            <p
+              class="hint">Click the chart to pick a point; then ← → move it a week and ↑ ↓ one event.</p>
           </div>
-          <div id="answer-text"></div>
-          <details>
-            <summary>Response JSON</summary>
-            <pre id="json"></pre>
-          </details>
-        </div>
-        <div class="panel">
-          <h2>Every assertion for this key</h2>
-          <table>
-            <thead><tr><th>Event</th><th>Valid from</th><th>Value</th><th></th></tr></thead>
-            <tbody id="history"></tbody>
-          </table>
-        </div>
+          <figure>
+            <svg class="plane" id="plane" tabindex="0" role="img"
+              aria-describedby="answer-text"></svg>
+          </figure>
+
+          <div class="answer">
+            <div class="panel" id="answer-panel" aria-live="polite">
+              <div class="request">
+                <code id="request"></code>
+                <button class="copy" id="copy"
+                  type="button">Copy as curl</button>
+              </div>
+              <div id="answer-text"></div>
+              <details>
+                <summary>Response JSON</summary>
+                <pre id="json"></pre>
+              </details>
+            </div>
+            <div class="panel">
+              <h2>Every assertion for this key</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Event</th>
+                    <th>Valid from</th>
+                    <th>Value</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="history"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
-  </div>
 
-  <div class="foot">
-    <p>The page reads with a public key that can't commit. Event numbers count the store's commits; the agent committed once for each message with something to record, so 24 events came from 26 messages. Valid times follow the messages' dates, and the events were committed on 27 November 2026.</p>
-    <p>The customer and company are fictional. The store runs on one small server, so the page may be slow to answer.</p>
-  </div>
-</div>
+      <div class="foot">
+        <p>The page reads with a public key that can't commit. Event numbers count the store's commits; the agent committed once for each message with something to record, so 24 events came from 26 messages. Valid times follow the messages' dates, and the events were committed on 27 November 2026.</p>
+        <p>The customer and company are fictional. The store runs on one small server, so the page may be slow to answer.</p>
+      </div>
+    </div>
 
-<script>
-const API = "https://2tdb.duckdns.org";
-const KEY = "2tdb_6a596f0e533c047d5e5828f6de4c398934073dd02a8c2f84ee7851a603b21f10";
-const X0 = Date.UTC(2026, 0, 1), X1 = Date.UTC(2027, 0, 1);
-const DAY = 86400000;
-let W = 760, H = 330;
-const L = 96, R = 12, T = 12, B = 30;
+    <script>
+    const API = "https://2tdb.duckdns.org";
+    const KEY =
+      "2tdb_6a596f0e533c047d5e5828f6de4c398934073dd02a8c2f84ee7851a603b21f10";
+    const X0 = Date.UTC(2026, 0, 1), X1 = Date.UTC(2027, 0, 1);
+    const DAY = 86400000;
+    let W = 760, H = 330;
+    const L = 96, R = 12, T = 12, B = 30;
 
-const state = { histories: {}, messages: {}, lastEvent: 0, key: null, event: 0, validAt: 0 };
-const $ = (id) => document.getElementById(id);
+    const state = {
+      histories: {},
+      messages: {},
+      lastEvent: 0,
+      key: null,
+      event: 0,
+      validAt: 0,
+    };
+    const $ = (id) => document.getElementById(id);
 
-function url(path, params) {
-  return `${API}${path}?${new URLSearchParams(params)}`;
-}
-async function get(path, params = {}) {
-  const response = await fetch(url(path, params), { headers: { Authorization: `Bearer ${KEY}` } });
-  if (!response.ok) throw new Error(`${path} answered ${response.status}`);
-  return response.json();
-}
-
-const fmtDate = (ms) => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-const iso = (ms) => new Date(ms).toISOString().replace(".000Z", "Z");
-// a null value is a deletion
-const show = (v) => v === null ? "deleted" : typeof v === "string" ? v : JSON.stringify(v);
-
-// the store's rule, for drawing only: the assertion with the latest valid
-// time not after t wins, and among equal valid times the latest event
-function segments(history, event) {
-  const winners = new Map();
-  for (const a of history) {
-    if (a.event_id > event) continue;
-    winners.set(Date.parse(a.assertion.valid_from), a);
-  }
-  const starts = [...winners.keys()].sort((a, b) => a - b);
-  return starts.map((start, i) => ({
-    from: start, to: starts[i + 1] ?? X1, assertion: winners.get(start),
-  }));
-}
-
-// a correction re-asserts the same valid time in a later event; returns
-// each corrected assertion's event mapped to the event that corrected it
-function corrections(history) {
-  const latest = new Map(), corrected = new Map();
-  for (const a of history) {
-    const at = a.assertion.valid_from;
-    if (latest.has(at)) corrected.set(latest.get(at), a.event_id);
-    latest.set(at, a.event_id);
-  }
-  return corrected;
-}
-
-const xOf = (ms) => L + (Math.max(X0, Math.min(X1, ms)) - X0) / (X1 - X0) * (W - L - R);
-// rows of equal height, one per event that changed the key, so a band
-// recorded by a single event stays as readable as a long one
-function rows() {
-  const starts = [...new Set(state.histories[state.key].map((a) => a.event_id))].sort((a, b) => a - b);
-  if (starts[0] > 1) starts.unshift(1);
-  return starts.map((from, i) => ({ from, to: i + 1 < starts.length ? starts[i + 1] - 1 : state.lastEvent }));
-}
-const rowHeight = (count) => (H - T - B) / count;
-const el = (name, attrs, text) => {
-  const node = document.createElementNS("http://www.w3.org/2000/svg", name);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-  if (text !== undefined) node.textContent = text;
-  return node;
-};
-
-function drawPlane() {
-  const svg = $("plane");
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.replaceChildren();
-  const history = state.histories[state.key];
-  const values = [...new Set(history.map((a) => show(a.assertion.value)))];
-
-  for (let m = 0; m <= 12; m++) {
-    const x = xOf(Date.UTC(2026, m, 1));
-    svg.append(el("line", { class: "gridline", x1: x, x2: x, y1: T, y2: H - B }));
-    if (m < 12 && m % (W < 560 ? 3 : 1) === 0) {
-      svg.append(el("text", { x: x + 3, y: H - B + 16 }, new Date(Date.UTC(2026, m, 1)).toLocaleString("en-GB", { month: "short", timeZone: "UTC" })));
+    function url(path, params) {
+      return `${API}${path}?${new URLSearchParams(params)}`;
     }
-  }
-
-  const bands = rows();
-  const h = rowHeight(bands.length);
-  bands.forEach((row, i) => {
-    const y1 = T + (bands.length - 1 - i) * h, y2 = y1 + h;
-    for (const seg of segments(history, row.from)) {
-      const g = el("g", { class: "seg" });
-      const x1 = xOf(seg.from), x2 = xOf(seg.to);
-      const label = show(seg.assertion.assertion.value);
-      if (seg.assertion.assertion.value === null) continue;
-      g.append(el("rect", { x: x1, y: y1, width: Math.max(0, x2 - x1), height: h, fill: `var(--v${values.indexOf(label) % 5})` }));
-      g.append(el("title", {}, `${label}, valid from ${fmtDate(seg.from)}, recorded by event ${seg.assertion.event_id}`));
-      if (x2 - x1 > 8 * label.length + 12) g.append(el("text", { x: x1 + 6, y: y2 - 8 }, label));
-      svg.append(g);
+    async function get(path, params = {}) {
+      const response = await fetch(url(path, params), {
+        headers: { Authorization: `Bearer ${KEY}` },
+      });
+      if (!response.ok) throw new Error(`${path} answered ${response.status}`);
+      return response.json();
     }
-    svg.append(el("line", { class: "axis", x1: L, x2: W - R, y1: y2, y2: y2 }));
-    svg.append(el("text", { x: L - 8, y: (y1 + y2) / 2 + 4, "text-anchor": "end" }, row.to > row.from ? `events ${row.from}–${row.to}` : `event ${row.from}`));
-  });
 
-  if (Date.now() < X1) {
-    const now = xOf(Date.now());
-    svg.append(el("line", { class: "now", x1: now, x2: now, y1: T, y2: H - B }));
-    svg.append(el("text", { class: "now-label", x: now, y: H - 4, "text-anchor": "middle" }, "today"));
-  }
-  svg.append(el("line", { class: "axis", x1: L, x2: L, y1: T, y2: H - B }));
+    const fmtDate = (ms) =>
+      new Date(ms).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+    const iso = (ms) => new Date(ms).toISOString().replace(".000Z", "Z");
+    // a null value is a deletion
+    const show = (v) =>
+      v === null ? "deleted" : typeof v === "string" ? v : JSON.stringify(v);
 
-  const at = bands.findIndex((row) => row.from <= state.event && state.event <= row.to);
-  const cx = xOf(state.validAt), cy = T + (bands.length - 0.5 - at) * h;
-  svg.append(el("line", { class: "cross", x1: cx, x2: cx, y1: T, y2: H - B }));
-  svg.append(el("line", { class: "cross", x1: L, x2: W - R, y1: cy, y2: cy }));
-  svg.append(el("circle", { class: "dot", cx, cy, r: 5 }));
-}
-
-function drawHistory(decidingEvent) {
-  const history = state.histories[state.key];
-  const corrected = corrections(history);
-  $("history").replaceChildren(...history.map((a) => {
-    const tr = document.createElement("tr");
-    const decides = a.event_id === decidingEvent;
-    if (decides) tr.className = "decides";
-    const status = decides ? "answers your query"
-      : a.event_id > state.event ? `not yet known at event ${state.event}`
-      : corrected.has(a.event_id) ? `corrected by event ${corrected.get(a.event_id)}`
-      : "";
-    for (const [text, cls] of [
-      [`${a.event_id} · ${a.source}`, "mono"],
-      [fmtDate(Date.parse(a.assertion.valid_from)), "mono"],
-      [show(a.assertion.value), ""],
-      [status, "status"],
-    ]) {
-      const td = document.createElement("td");
-      td.textContent = text;
-      if (cls) td.className = cls;
-      tr.append(td);
+    // the store's rule, for drawing only: the assertion with the latest valid
+    // time not after t wins, and among equal valid times the latest event
+    function segments(history, event) {
+      const winners = new Map();
+      for (const a of history) {
+        if (a.event_id > event) continue;
+        winners.set(Date.parse(a.assertion.valid_from), a);
+      }
+      const starts = [...winners.keys()].sort((a, b) => a - b);
+      return starts.map((start, i) => ({
+        from: start,
+        to: starts[i + 1] ?? X1,
+        assertion: winners.get(start),
+      }));
     }
-    return tr;
-  }));
-}
 
-const params = () => ({ key: state.key, event: state.event, valid_at: iso(state.validAt) });
+    // a correction re-asserts the same valid time in a later event; returns
+    // each corrected assertion's event mapped to the event that corrected it
+    function corrections(history) {
+      const latest = new Map(), corrected = new Map();
+      for (const a of history) {
+        const at = a.assertion.valid_from;
+        if (latest.has(at)) corrected.set(latest.get(at), a.event_id);
+        latest.set(at, a.event_id);
+      }
+      return corrected;
+    }
 
-let pending = 0;
-async function query() {
-  const verb = document.createElement("span");
-  verb.className = "verb";
-  verb.textContent = "GET ";
-  const path = decodeURIComponent(url("/blame", params())).replace(API, "");
-  $("request").replaceChildren(verb, ...path.split(/(?=[?&])/).flatMap((part) => [document.createElement("wbr"), part]));
-  $("plane").setAttribute("aria-label", `Chart of ${state.key}; selected event ${state.event}, valid ${fmtDate(state.validAt)}`);
-  drawPlane();
-  const ticket = ++pending;
-  $("answer-panel").classList.add("stale");
-  let body;
-  try {
-    body = await get("/blame", params());
-  } catch (error) {
-    if (ticket !== pending) return;
-    $("answer-panel").classList.remove("stale");
-    $("json").textContent = "";
-    $("answer-text").innerHTML = `<p class="because">The API didn't answer (${error.message}). The server at 2tdb.duckdns.org may be down; try again in a minute.</p>`;
-    return;
-  }
-  if (ticket !== pending) return;
-  $("answer-panel").classList.remove("stale");
-  $("json").textContent = JSON.stringify(body, null, 2);
-  const a = body.assertion;
-  const out = $("answer-text");
-  out.replaceChildren();
-  const value = document.createElement("p");
-  const text = a ? show(a.assertion.value) : "no value";
-  value.className = !a ? "value none" : text.length > 24 ? "value long" : "value";
-  value.textContent = text;
-  out.append(value);
-  const because = document.createElement("p");
-  because.className = "because";
-  because.textContent = a
-    ? `Valid from ${fmtDate(Date.parse(a.assertion.valid_from))}, recorded by event ${a.event_id} from ${a.source}.`
-    : `After event ${state.event}, the store had nothing for ${state.key} valid on ${fmtDate(state.validAt)}.`;
-  out.append(because);
-  const message = a && state.messages[a.source];
-  if (message) {
-    const quote = document.createElement("blockquote");
-    quote.textContent = message.text;
-    const foot = document.createElement("footer");
-    foot.textContent = `${a.source}, sent ${fmtDate(Date.parse(message.sent_at))}`;
-    quote.append(foot);
-    out.append(quote);
-  }
-  drawHistory(a?.event_id);
-}
+    const xOf = (ms) =>
+      L + (Math.max(X0, Math.min(X1, ms)) - X0) / (X1 - X0) * (W - L - R);
+    // rows of equal height, one per event that changed the key, so a band
+    // recorded by a single event stays as readable as a long one
+    function rows() {
+      const starts = [
+        ...new Set(state.histories[state.key].map((a) => a.event_id)),
+      ].sort((a, b) => a - b);
+      if (starts[0] > 1) starts.unshift(1);
+      return starts.map((from, i) => ({
+        from,
+        to: i + 1 < starts.length ? starts[i + 1] - 1 : state.lastEvent,
+      }));
+    }
+    const rowHeight = (count) => (H - T - B) / count;
+    const el = (name, attrs, text) => {
+      const node = document.createElementNS("http://www.w3.org/2000/svg", name);
+      for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
 
-function select(key) {
-  state.key = key;
-  $("key-name").textContent = key;
-  for (const b of document.querySelectorAll(".keys button")) b.setAttribute("aria-pressed", String(b.dataset.key === key));
-  query();
-}
+    function drawPlane() {
+      const svg = $("plane");
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      svg.replaceChildren();
+      const history = state.histories[state.key];
+      const values = [...new Set(history.map((a) => show(a.assertion.value)))];
 
-function move(event, validAt) {
-  state.event = Math.max(1, Math.min(state.lastEvent, event));
-  state.validAt = Math.max(X0, Math.min(X1 - DAY, validAt));
-  query();
-}
+      for (let m = 0; m <= 12; m++) {
+        const x = xOf(Date.UTC(2026, m, 1));
+        svg.append(
+          el("line", { class: "gridline", x1: x, x2: x, y1: T, y2: H - B }),
+        );
+        if (m < 12 && m % (W < 560 ? 3 : 1) === 0) {
+          svg.append(
+            el(
+              "text",
+              { x: x + 3, y: H - B + 16 },
+              new Date(Date.UTC(2026, m, 1)).toLocaleString("en-GB", {
+                month: "short",
+                timeZone: "UTC",
+              }),
+            ),
+          );
+        }
+      }
 
-// draws the chart at the size it's shown, so its text stays at 11-12px
-function fit() {
-  W = Math.max(300, Math.round($("plane").getBoundingClientRect().width));
-  H = W < 560 ? 260 : 330;
-}
-let resizing;
-addEventListener("resize", () => {
-  clearTimeout(resizing);
-  resizing = setTimeout(() => { if (state.key) { fit(); drawPlane(); } }, 100);
-});
+      const bands = rows();
+      const h = rowHeight(bands.length);
+      bands.forEach((row, i) => {
+        const y1 = T + (bands.length - 1 - i) * h, y2 = y1 + h;
+        for (const seg of segments(history, row.from)) {
+          const g = el("g", { class: "seg" });
+          const x1 = xOf(seg.from), x2 = xOf(seg.to);
+          const label = show(seg.assertion.assertion.value);
+          if (seg.assertion.assertion.value === null) continue;
+          g.append(
+            el("rect", {
+              x: x1,
+              y: y1,
+              width: Math.max(0, x2 - x1),
+              height: h,
+              fill: `var(--v${values.indexOf(label) % 5})`,
+            }),
+          );
+          g.append(
+            el(
+              "title",
+              {},
+              `${label}, valid from ${
+                fmtDate(seg.from)
+              }, recorded by event ${seg.assertion.event_id}`,
+            ),
+          );
+          if (x2 - x1 > 8 * label.length + 12) {
+            g.append(el("text", { x: x1 + 6, y: y2 - 8 }, label));
+          }
+          svg.append(g);
+        }
+        svg.append(
+          el("line", { class: "axis", x1: L, x2: W - R, y1: y2, y2: y2 }),
+        );
+        svg.append(
+          el(
+            "text",
+            { x: L - 8, y: (y1 + y2) / 2 + 4, "text-anchor": "end" },
+            row.to > row.from
+              ? `events ${row.from}–${row.to}`
+              : `event ${row.from}`,
+          ),
+        );
+      });
 
-$("plane").addEventListener("click", (e) => {
-  const svg = $("plane");
-  const point = svg.createSVGPoint();
-  point.x = e.clientX; point.y = e.clientY;
-  const p = point.matrixTransform(svg.getScreenCTM().inverse());
-  if (p.x < L) return;
-  const validAt = X0 + (p.x - L) / (W - L - R) * (X1 - X0);
-  const bands = rows();
-  const i = bands.length - 1 - Math.floor((p.y - T) / rowHeight(bands.length));
-  const row = bands[Math.max(0, Math.min(bands.length - 1, i))];
-  const event = row.from <= state.event && state.event <= row.to ? state.event : row.to;
-  move(event, Math.floor(validAt / DAY) * DAY);
-});
-$("plane").addEventListener("keydown", (e) => {
-  const step = { ArrowLeft: [0, -7], ArrowRight: [0, 7], ArrowUp: [1, 0], ArrowDown: [-1, 0] }[e.key];
-  if (!step) return;
-  e.preventDefault();
-  move(state.event + step[0], state.validAt + step[1] * DAY);
-});
-$("copy").addEventListener("click", async () => {
-  const curl = `curl -H "Authorization: Bearer ${KEY}" "${url("/blame", params())}"`;
-  try {
-    await navigator.clipboard.writeText(curl);
-    $("copy").textContent = "Copied";
-  } catch {
-    $("copy").textContent = "Copy failed";
-  }
-  setTimeout(() => { $("copy").textContent = "Copy as curl"; }, 1500);
-});
+      if (Date.now() < X1) {
+        const now = xOf(Date.now());
+        svg.append(
+          el("line", { class: "now", x1: now, x2: now, y1: T, y2: H - B }),
+        );
+        svg.append(
+          el("text", {
+            class: "now-label",
+            x: now,
+            y: H - 4,
+            "text-anchor": "middle",
+          }, "today"),
+        );
+      }
+      svg.append(el("line", { class: "axis", x1: L, x2: L, y1: T, y2: H - B }));
 
-async function start() {
-  try {
-    const [keys, messages] = await Promise.all([
-      get("/keys"),
-      fetch("messages.json").then((r) => {
-        if (!r.ok) throw new Error(`messages.json answered ${r.status}`);
-        return r.json();
-      }),
-    ]);
-    state.messages = messages;
-    const histories = await Promise.all(keys.map((key) => get("/history", { key })));
-    keys.forEach((key, i) => { state.histories[key] = histories[i]; });
-  } catch (error) {
-    $("main").innerHTML = `<div class="error">The demo data didn't load (${error.message}). The API server at 2tdb.duckdns.org may be down or restarting; the <a href="https://github.com/adityakamath255/2TDB">source and README</a> describe what this page shows.</div>`;
-    $("keys").replaceChildren();
-    return;
-  }
-  state.lastEvent = Math.max(...Object.values(state.histories).flat().map((a) => a.event_id));
-  const keys = Object.keys(state.histories);
-  $("keys").replaceChildren(...keys.map((key) => {
-    const history = state.histories[key];
-    const corrected = corrections(history).size > 0;
-    const li = document.createElement("li");
-    const b = document.createElement("button");
-    b.type = "button";
-    b.dataset.key = key;
-    b.textContent = key;
-    const tag = document.createElement("span");
-    tag.className = "tag";
-    tag.textContent = corrected ? "corrected" : history.length > 1 ? "changed" : "";
-    b.append(tag);
-    b.addEventListener("click", () => select(key));
-    li.append(b);
-    return li;
-  }));
-  fit();
-  state.event = state.lastEvent;
-  state.validAt = Date.UTC(2026, 5, 1);
-  select(keys.includes("seats") ? "seats" : keys[0]);
-}
-start();
-</script>
-</body>
+      const at = bands.findIndex((row) =>
+        row.from <= state.event && state.event <= row.to
+      );
+      const cx = xOf(state.validAt), cy = T + (bands.length - 0.5 - at) * h;
+      svg.append(el("line", { class: "cross", x1: cx, x2: cx, y1: T, y2: H - B }));
+      svg.append(el("line", { class: "cross", x1: L, x2: W - R, y1: cy, y2: cy }));
+      svg.append(el("circle", { class: "dot", cx, cy, r: 5 }));
+    }
+
+    function drawHistory(decidingEvent) {
+      const history = state.histories[state.key];
+      const corrected = corrections(history);
+      $("history").replaceChildren(...history.map((a) => {
+        const tr = document.createElement("tr");
+        const decides = a.event_id === decidingEvent;
+        if (decides) tr.className = "decides";
+        const status = decides
+          ? "answers your query"
+          : a.event_id > state.event
+          ? `not yet known at event ${state.event}`
+          : corrected.has(a.event_id)
+          ? `corrected by event ${corrected.get(a.event_id)}`
+          : "";
+        for (
+          const [text, cls] of [
+            [`${a.event_id} · ${a.source}`, "mono"],
+            [fmtDate(Date.parse(a.assertion.valid_from)), "mono"],
+            [show(a.assertion.value), ""],
+            [status, "status"],
+          ]
+        ) {
+          const td = document.createElement("td");
+          td.textContent = text;
+          if (cls) td.className = cls;
+          tr.append(td);
+        }
+        return tr;
+      }));
+    }
+
+    const params = () => ({
+      key: state.key,
+      event: state.event,
+      valid_at: iso(state.validAt),
+    });
+
+    let pending = 0;
+    async function query() {
+      const verb = document.createElement("span");
+      verb.className = "verb";
+      verb.textContent = "GET ";
+      const path = decodeURIComponent(url("/blame", params())).replace(API, "");
+      $("request").replaceChildren(
+        verb,
+        ...path.split(/(?=[?&])/).flatMap((
+          part,
+        ) => [document.createElement("wbr"), part]),
+      );
+      $("plane").setAttribute(
+        "aria-label",
+        `Chart of ${state.key}; selected event ${state.event}, valid ${
+          fmtDate(state.validAt)
+        }`,
+      );
+      drawPlane();
+      const ticket = ++pending;
+      $("answer-panel").classList.add("stale");
+      let body;
+      try {
+        body = await get("/blame", params());
+      } catch (error) {
+        if (ticket !== pending) return;
+        $("answer-panel").classList.remove("stale");
+        $("json").textContent = "";
+        $("answer-text").innerHTML =
+          `<p class="because">The API didn't answer (${error.message}). The server at 2tdb.duckdns.org may be down; try again in a minute.</p>`;
+        return;
+      }
+      if (ticket !== pending) return;
+      $("answer-panel").classList.remove("stale");
+      $("json").textContent = JSON.stringify(body, null, 2);
+      const a = body.assertion;
+      const out = $("answer-text");
+      out.replaceChildren();
+      const value = document.createElement("p");
+      const text = a ? show(a.assertion.value) : "no value";
+      value.className = !a
+        ? "value none"
+        : text.length > 24
+        ? "value long"
+        : "value";
+      value.textContent = text;
+      out.append(value);
+      const because = document.createElement("p");
+      because.className = "because";
+      because.textContent = a
+        ? `Valid from ${
+          fmtDate(Date.parse(a.assertion.valid_from))
+        }, recorded by event ${a.event_id} from ${a.source}.`
+        : `After event ${state.event}, the store had nothing for ${state.key} valid on ${
+          fmtDate(state.validAt)
+        }.`;
+      out.append(because);
+      const message = a && state.messages[a.source];
+      if (message) {
+        const quote = document.createElement("blockquote");
+        quote.textContent = message.text;
+        const foot = document.createElement("footer");
+        foot.textContent = `${a.source}, sent ${
+          fmtDate(Date.parse(message.sent_at))
+        }`;
+        quote.append(foot);
+        out.append(quote);
+      }
+      drawHistory(a?.event_id);
+    }
+
+    function select(key) {
+      state.key = key;
+      $("key-name").textContent = key;
+      for (const b of document.querySelectorAll(".keys button")) {
+        b.setAttribute("aria-pressed", String(b.dataset.key === key));
+      }
+      query();
+    }
+
+    function move(event, validAt) {
+      state.event = Math.max(1, Math.min(state.lastEvent, event));
+      state.validAt = Math.max(X0, Math.min(X1 - DAY, validAt));
+      query();
+    }
+
+    // draws the chart at the size it's shown, so its text stays at 11-12px
+    function fit() {
+      W = Math.max(300, Math.round($("plane").getBoundingClientRect().width));
+      H = W < 560 ? 260 : 330;
+    }
+    let resizing;
+    addEventListener("resize", () => {
+      clearTimeout(resizing);
+      resizing = setTimeout(() => {
+        if (state.key) {
+          fit();
+          drawPlane();
+        }
+      }, 100);
+    });
+
+    $("plane").addEventListener("click", (e) => {
+      const svg = $("plane");
+      const point = svg.createSVGPoint();
+      point.x = e.clientX;
+      point.y = e.clientY;
+      const p = point.matrixTransform(svg.getScreenCTM().inverse());
+      if (p.x < L) return;
+      const validAt = X0 + (p.x - L) / (W - L - R) * (X1 - X0);
+      const bands = rows();
+      const i = bands.length - 1 - Math.floor((p.y - T) / rowHeight(bands.length));
+      const row = bands[Math.max(0, Math.min(bands.length - 1, i))];
+      const event = row.from <= state.event && state.event <= row.to
+        ? state.event
+        : row.to;
+      move(event, Math.floor(validAt / DAY) * DAY);
+    });
+    $("plane").addEventListener("keydown", (e) => {
+      const step = {
+        ArrowLeft: [0, -7],
+        ArrowRight: [0, 7],
+        ArrowUp: [1, 0],
+        ArrowDown: [-1, 0],
+      }[e.key];
+      if (!step) return;
+      e.preventDefault();
+      move(state.event + step[0], state.validAt + step[1] * DAY);
+    });
+    $("copy").addEventListener("click", async () => {
+      const curl = `curl -H "Authorization: Bearer ${KEY}" "${
+        url("/blame", params())
+      }"`;
+      try {
+        await navigator.clipboard.writeText(curl);
+        $("copy").textContent = "Copied";
+      } catch {
+        $("copy").textContent = "Copy failed";
+      }
+      setTimeout(() => {
+        $("copy").textContent = "Copy as curl";
+      }, 1500);
+    });
+
+    async function start() {
+      try {
+        const [keys, messages] = await Promise.all([
+          get("/keys"),
+          fetch("messages.json").then((r) => {
+            if (!r.ok) throw new Error(`messages.json answered ${r.status}`);
+            return r.json();
+          }),
+        ]);
+        state.messages = messages;
+        const histories = await Promise.all(
+          keys.map((key) => get("/history", { key })),
+        );
+        keys.forEach((key, i) => {
+          state.histories[key] = histories[i];
+        });
+      } catch (error) {
+        $("main").innerHTML =
+          `<div class="error">The demo data didn't load (${error.message}). The API server at 2tdb.duckdns.org may be down or restarting; the <a href="https://github.com/adityakamath255/2TDB">source and README</a> describe what this page shows.</div>`;
+        $("keys").replaceChildren();
+        return;
+      }
+      state.lastEvent = Math.max(
+        ...Object.values(state.histories).flat().map((a) => a.event_id),
+      );
+      const keys = Object.keys(state.histories);
+      $("keys").replaceChildren(...keys.map((key) => {
+        const history = state.histories[key];
+        const corrected = corrections(history).size > 0;
+        const li = document.createElement("li");
+        const b = document.createElement("button");
+        b.type = "button";
+        b.dataset.key = key;
+        b.textContent = key;
+        const tag = document.createElement("span");
+        tag.className = "tag";
+        tag.textContent = corrected
+          ? "corrected"
+          : history.length > 1
+          ? "changed"
+          : "";
+        b.append(tag);
+        b.addEventListener("click", () => select(key));
+        li.append(b);
+        return li;
+      }));
+      fit();
+      state.event = state.lastEvent;
+      state.validAt = Date.UTC(2026, 5, 1);
+      select(keys.includes("seats") ? "seats" : keys[0]);
+    }
+    start();
+    </script>
+  </body>
 </html>
