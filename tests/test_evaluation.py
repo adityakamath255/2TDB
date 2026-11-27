@@ -5,7 +5,7 @@ import pytest
 
 from evaluation.run import correct, evaluate, report
 from evaluation.scenario import MESSAGES, QUESTIONS
-from two_tdb.agent import Reply
+from py2tdb.agent import Reply
 
 
 @pytest.mark.parametrize(
@@ -36,7 +36,7 @@ def test_the_harness_scores_each_system_and_kind(new_store):
     }
     seen = []
 
-    def two_tdb(store):
+    def memory_agent(store):
         def respond(message):
             seen.append(message.id)
             return Reply(expected.get(message.text, "unknown"), 1000, 100, 2)
@@ -48,7 +48,7 @@ def test_the_harness_scores_each_system_and_kind(new_store):
             lambda q: Reply("unknown", 500, 10, 0)
         )
 
-    ingests, results = evaluate(2, new_store, two_tdb, rag)
+    ingests, results = evaluate(2, new_store, memory_agent, rag)
 
     assert seen[: len(MESSAGES) + 1] == [m.id for m in MESSAGES] + [
         QUESTIONS[0].id

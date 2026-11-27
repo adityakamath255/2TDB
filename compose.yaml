@@ -4,14 +4,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: two_tdb
-      TWO_TDB_APP_PASSWORD: ${TWO_TDB_APP_PASSWORD:-two_tdb_app}
+      POSTGRES_DB: pg2tdb
+      PY2TDB_APP_PASSWORD: ${PY2TDB_APP_PASSWORD:-pg2tdb_app}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - db:/var/lib/postgresql
       # run once, on an empty volume
-      - ./src/two_tdb/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql:ro
+      - ./src/py2tdb/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql:ro
       - ./deploy/app-login.sh:/docker-entrypoint-initdb.d/2-app-login.sh:ro
     healthcheck:
       # over TCP, which the image's init server doesn't listen on
@@ -23,8 +23,8 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      TWO_TDB_DATABASE_URL: postgresql://two_tdb_app:${TWO_TDB_APP_PASSWORD:-two_tdb_app}@db/two_tdb
-      TWO_TDB_CORS_ORIGIN: ${TWO_TDB_CORS_ORIGIN:-}
+      PY2TDB_DATABASE_URL: postgresql://pg2tdb_app:${PY2TDB_APP_PASSWORD:-pg2tdb_app}@db/pg2tdb
+      PY2TDB_CORS_ORIGIN: ${PY2TDB_CORS_ORIGIN:-}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:

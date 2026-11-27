@@ -12,8 +12,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from psycopg_pool import ConnectionPool, PoolTimeout
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
-from two_tdb.embedding import Embedder
-from two_tdb.model import (
+from py2tdb.embedding import Embedder
+from py2tdb.model import (
     Added,
     Changed,
     Delta,
@@ -26,7 +26,7 @@ from two_tdb.model import (
     Value,
     Write,
 )
-from two_tdb.store import Embed, Reader, Snapshot, Store
+from py2tdb.store import Embed, Reader, Snapshot, Store
 
 
 class At(BaseModel, extra="forbid"):
@@ -221,7 +221,7 @@ type ReaderDep = Annotated[Reader, Depends(_reader)]
 def create_app(
     conninfo: str, embed: Embed, cors_origin: str | None = None
 ) -> FastAPI:
-    """Returns the HTTP API; conninfo must log in as two_tdb_app.
+    """Returns the HTTP API; conninfo must log in as pg2tdb_app.
 
     A page served from cors_origin may read through the API from a browser.
     """
@@ -349,12 +349,12 @@ def create_app(
 
 
 def from_environment() -> FastAPI:
-    """The app for `uvicorn --factory`, connecting to TWO_TDB_DATABASE_URL.
+    """The app for `uvicorn --factory`, connecting to PY2TDB_DATABASE_URL.
 
-    TWO_TDB_CORS_ORIGIN, if set, names the one origin whose pages may read.
+    PY2TDB_CORS_ORIGIN, if set, names the one origin whose pages may read.
     """
     return create_app(
-        os.environ["TWO_TDB_DATABASE_URL"],
+        os.environ["PY2TDB_DATABASE_URL"],
         Embedder(),
-        os.environ.get("TWO_TDB_CORS_ORIGIN"),
+        os.environ.get("PY2TDB_CORS_ORIGIN"),
     )

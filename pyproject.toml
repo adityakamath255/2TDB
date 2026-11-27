@@ -1,5 +1,5 @@
 [project]
-name = "two-tdb"
+name = "2tdb"
 version = "0.1.0"
 description = "A bitemporal key-value store on Postgres, served over HTTP to programs and LLM agents."
 readme = "README.md"
@@ -17,6 +17,10 @@ dependencies = [
     "pydantic>=2.14.4",
     "uvicorn>=0.54.0",
 ]
+
+[tool.uv.build-backend]
+# the distribution is 2tdb, but a module name can't start with a digit
+module-name = "py2tdb"
 
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14.0"]

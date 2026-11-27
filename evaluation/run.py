@@ -26,15 +26,15 @@ from psycopg import sql
 
 from evaluation import baseline
 from evaluation.scenario import MESSAGES, QUESTIONS, Kind
-from two_tdb import Store, agent, install
-from two_tdb.agent import Message, Reply
-from two_tdb.embedding import Embedder
-from two_tdb.store import Embed
+from py2tdb import Store, agent, install
+from py2tdb.agent import Message, Reply
+from py2tdb.embedding import Embedder
+from py2tdb.store import Embed
 
 SERVER = os.environ.get(
-    "TWO_TDB_EVAL_SERVER", "postgresql://postgres:postgres@localhost:5432"
+    "PY2TDB_EVAL_SERVER", "postgresql://postgres:postgres@localhost:5432"
 )
-DATABASE = "two_tdb_eval"
+DATABASE = "pg2tdb_eval"
 RESULTS = Path(__file__).parent / "results"
 
 # Claude Haiku 5.5, dollars per million tokens
@@ -151,7 +151,7 @@ def _stores(embed: Embed) -> Iterator[Callable[[], Store]]:
             connection = psycopg.connect(
                 f"{SERVER}/{DATABASE}", autocommit=True
             )
-            connection.execute("SET ROLE two_tdb_app")
+            connection.execute("SET ROLE pg2tdb_app")
             opened.append(connection)
             return Store(connection, tenant, embed)
 
@@ -165,12 +165,12 @@ def _stores(embed: Embed) -> Iterator[Callable[[], Store]]:
 def evaluate(
     repeats: int,
     new_store: Callable[[], Store],
-    two_tdb: Callable[[Store], Responder],
+    memory_agent: Callable[[Store], Responder],
     rag: Callable[[], tuple[Responder, Responder]],
 ) -> tuple[list[Ingest], list[Result]]:
     ingests, results = [], []
     for repeat in range(1, repeats + 1):
-        respond = two_tdb(new_store())
+        respond = memory_agent(new_store())
         ingest, answers = run_system("2TDB agent", repeat, respond, respond)
         ingests.append(ingest)
         results += answers
@@ -229,7 +229,7 @@ def main() -> None:
     client = anthropic.Anthropic()
     graph = agent.build(agent.chat_model())
 
-    def two_tdb(store: Store) -> Responder:
+    def memory_agent(store: Store) -> Responder:
         return lambda message: agent.respond(graph, store, message)
 
     def rag() -> tuple[Responder, Responder]:
@@ -244,7 +244,7 @@ def main() -> None:
         )
 
     with _stores(embed) as new_store:
-        ingests, results = evaluate(args.repeats, new_store, two_tdb, rag)
+        ingests, results = evaluate(args.repeats, new_store, memory_agent, rag)
     table = report(ingests, results)
     RESULTS.mkdir(exist_ok=True)
     path = RESULTS / f"{datetime.now(UTC):%Y-%m-%dT%H%M}.json"

@@ -1,9 +1,9 @@
 """Fills a tenant with what the agent records from the scenario's messages.
 
-    ANTHROPIC_API_KEY=... TWO_TDB_DATABASE_URL=... \\
+    ANTHROPIC_API_KEY=... PY2TDB_DATABASE_URL=... \\
         uv run python -m evaluation.seed TENANT
 
-TWO_TDB_DATABASE_URL must log in as two_tdb_app. The tenant must have no
+PY2TDB_DATABASE_URL must log in as pg2tdb_app. The tenant must have no
 events, so a seed that stopped partway is never mixed with another.
 """
 
@@ -13,8 +13,8 @@ import os
 import psycopg
 
 from evaluation.scenario import MESSAGES
-from two_tdb import Store, agent
-from two_tdb.embedding import Embedder
+from py2tdb import Store, agent
+from py2tdb.embedding import Embedder
 
 
 def main() -> None:
@@ -25,7 +25,7 @@ def main() -> None:
     parser.add_argument("tenant", type=int)
     args = parser.parse_args()
 
-    url = os.environ["TWO_TDB_DATABASE_URL"]
+    url = os.environ["PY2TDB_DATABASE_URL"]
     with psycopg.connect(url, autocommit=True) as connection:
         store = Store(connection, args.tenant, Embedder())
         if not store.is_empty():

@@ -9,18 +9,18 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg import sql
 
-from two_tdb import Reader, Store, install
-from two_tdb.api import create_app
+from py2tdb import Reader, Store, install
+from py2tdb.api import create_app
 
 # a Postgres server whose user may create databases, such as
 # `docker compose up db`
 SERVER = os.environ.get(
-    "TWO_TDB_TEST_SERVER", "postgresql://postgres:postgres@localhost:5432"
+    "PY2TDB_TEST_SERVER", "postgresql://postgres:postgres@localhost:5432"
 )
-DATABASE = "two_tdb_test"
+DATABASE = "pg2tdb_test"
 # the role is shared by every database on the server; compose.yaml uses
 # the same default
-APP_PASSWORD = os.environ.get("TWO_TDB_APP_PASSWORD", "two_tdb_app")
+APP_PASSWORD = os.environ.get("PY2TDB_APP_PASSWORD", "pg2tdb_app")
 
 
 def embed(texts: Sequence[str]) -> list[list[float]]:
@@ -59,12 +59,12 @@ def owner(database: str) -> Iterator[psycopg.Connection]:
 
 @pytest.fixture
 def connect_app(database: str) -> Iterator[Callable[[], psycopg.Connection]]:
-    """Opens connections as two_tdb_app, the role the service uses."""
+    """Opens connections as pg2tdb_app, the role the service uses."""
     opened: list[psycopg.Connection] = []
 
     def connect() -> psycopg.Connection:
         connection = psycopg.connect(database, autocommit=True)
-        connection.execute("SET ROLE two_tdb_app")
+        connection.execute("SET ROLE pg2tdb_app")
         opened.append(connection)
         return connection
 
@@ -112,14 +112,14 @@ def open_reader(connect_app) -> Callable[[int], Reader]:
 def app(database: str) -> Iterator[TestClient]:
     with psycopg.connect(database, autocommit=True) as owner:
         owner.execute(
-            sql.SQL("ALTER ROLE two_tdb_app LOGIN PASSWORD {}").format(
+            sql.SQL("ALTER ROLE pg2tdb_app LOGIN PASSWORD {}").format(
                 APP_PASSWORD
             )
         )
     host = SERVER.split("@", 1)[1]
     with TestClient(
         create_app(
-            f"postgresql://two_tdb_app:{APP_PASSWORD}@{host}/{DATABASE}", embed
+            f"postgresql://pg2tdb_app:{APP_PASSWORD}@{host}/{DATABASE}", embed
         )
     ) as client:
         yield client

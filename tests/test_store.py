@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 import pytest
 
-from two_tdb import (
+from py2tdb import (
     Added,
     Assertion,
     Changed,
@@ -17,7 +17,7 @@ from two_tdb import (
     Store,
     Write,
 )
-from two_tdb.embedding import Embedder
+from py2tdb.embedding import Embedder
 
 
 def ts(text: str) -> datetime:

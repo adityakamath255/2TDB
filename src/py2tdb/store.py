@@ -8,7 +8,7 @@ from string.templatelib import Template
 
 import psycopg
 
-from two_tdb.model import (
+from py2tdb.model import (
     Added,
     Assertion,
     Changed,
@@ -46,11 +46,11 @@ _KEYS = t"""
 
 
 def install(connection: psycopg.Connection) -> None:
-    """Creates the schema and the two_tdb_app role.
+    """Creates the schema and the pg2tdb_app role.
 
     Run as the owner of an empty database.
     """
-    connection.execute(files("two_tdb").joinpath("schema.sql").read_bytes())
+    connection.execute(files("py2tdb").joinpath("schema.sql").read_bytes())
 
 
 def _encode(

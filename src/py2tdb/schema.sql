@@ -1,10 +1,10 @@
 -- run by the database owner on an empty database. the app connects as
--- two_tdb_app, which may only read and append, and only within the tenant
+-- pg2tdb_app, which may only read and append, and only within the tenant
 -- named by the transaction-local setting app.tenant.
 
 DO $$
 BEGIN
-    CREATE ROLE two_tdb_app NOLOGIN;
+    CREATE ROLE pg2tdb_app NOLOGIN;
 EXCEPTION WHEN duplicate_object THEN
     NULL;
 END
@@ -47,7 +47,7 @@ CREATE TABLE changes (
     float_value double precision
         CHECK (float_value NOT IN ('NaN', 'Infinity', '-Infinity')),
     str_value   text,
-    -- "key: value" embedded by two_tdb.embedding.MODEL; null for a deletion
+    -- "key: value" embedded by py2tdb.embedding.MODEL; null for a deletion
     embedding   vector(384) CHECK ((kind = 'delete') = (embedding IS NULL)),
     PRIMARY KEY (tenant, key, valid, seq),
     FOREIGN KEY (tenant, seq) REFERENCES events,
@@ -64,7 +64,7 @@ ALTER TABLE changes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_tenant ON events USING (tenant = current_tenant());
 CREATE POLICY own_tenant ON changes USING (tenant = current_tenant());
 
-GRANT SELECT, INSERT ON events, changes TO two_tdb_app;
+GRANT SELECT, INSERT ON events, changes TO pg2tdb_app;
 
 -- API keys are stored as SHA-256 hashes; a key is shown once, by
 -- create_api_key. the app can only resolve a key, through api_key_tenant.
@@ -100,4 +100,4 @@ RETURN (
 );
 
 REVOKE EXECUTE ON FUNCTION api_key_tenant FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION api_key_tenant TO two_tdb_app;
+GRANT EXECUTE ON FUNCTION api_key_tenant TO pg2tdb_app;

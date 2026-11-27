@@ -23,8 +23,8 @@ Start Postgres and the API, then create a tenant and a key:
 
 ```sh
 docker compose up -d --wait
-docker compose exec db psql -U postgres -d two_tdb -c "INSERT INTO tenants (name) VALUES ('acme')"
-KEY=$(docker compose exec db psql -U postgres -d two_tdb -Atc "SELECT create_api_key(1, true)")
+docker compose exec db psql -U postgres -d pg2tdb -c "INSERT INTO tenants (name) VALUES ('acme')"
+KEY=$(docker compose exec db psql -U postgres -d pg2tdb -Atc "SELECT create_api_key(1, true)")
 ```
 
 `create_api_key(tenant, writable)` returns the key once; the database keeps only its SHA-256 hash. A key made with `writable` false can read but not commit.
@@ -74,7 +74,7 @@ Reads take a snapshot as query parameters: `event` or `known_at` for the transac
 | `GET /diff` | how two snapshots differ, given as `from_event`, `to_valid_at`, and so on |
 | `GET /keys` | every key ever asserted |
 
-The Python library underneath (`two_tdb.Store` and the read-only `two_tdb.Reader`) offers the same operations, plus `bisect`, which finds the first event after which a predicate on the snapshot holds.
+The Python library underneath, imported as `py2tdb` because a Python module name can't start with a digit (`py2tdb.Store` and the read-only `py2tdb.Reader`), offers the same operations, plus `bisect`, which finds the first event after which a predicate on the snapshot holds.
 
 ## Storage
 
@@ -84,7 +84,7 @@ Each assertion's text (`key: value`) is embedded with all-MiniLM-L6-v2 when it i
 
 ## Agent and evaluation
 
-`two_tdb.agent` is a support agent built with LangChain's `create_agent` on Claude Haiku 5.5. It handles each message without chat history: it reads the customer's facts through tools (`facts`, `lookup`, `blame`, `history`, `search`) and records new ones with `remember`, which commits with the message ID as the source. Facts are restricted to a fixed list of typed attributes plus free-text notes.
+`py2tdb.agent` is a support agent built with LangChain's `create_agent` on Claude Haiku 5.5. It handles each message without chat history: it reads the customer's facts through tools (`facts`, `lookup`, `blame`, `history`, `search`) and records new ones with `remember`, which commits with the message ID as the source. Facts are restricted to a fixed list of typed attributes plus free-text notes.
 
 The evaluation feeds 26 messages from one customer, January to October 2026, to the agent and to a baseline that stores the raw messages and answers from the five closest by meaning. The messages include changes, back-dated and future-dated facts, and eight corrections. Both then answer 24 questions: about current facts, facts at an earlier date, and what the records said before a correction. Answers are compared exactly after normalising case, spacing and punctuation.
 
@@ -108,19 +108,19 @@ The demo runs on Google Cloud's free-tier e2-micro VM (2 shared vCPUs, 1 GB of m
 COMPOSE_PROFILES=public
 DOMAIN=2tdb.duckdns.org
 POSTGRES_PASSWORD=...
-TWO_TDB_APP_PASSWORD=...
-TWO_TDB_CORS_ORIGIN=https://adityakamath255.github.io
+PY2TDB_APP_PASSWORD=...
+PY2TDB_CORS_ORIGIN=https://adityakamath255.github.io
 ```
 
-`TWO_TDB_CORS_ORIGIN` lets the demo page, which GitHub Pages serves from `docs/` on `main`, call the API from a browser. The page quotes each fact's source message from `docs/messages.json`, a copy of the scenario's messages that a test keeps equal to them.
+`PY2TDB_CORS_ORIGIN` lets the demo page, which GitHub Pages serves from `docs/` on `main`, call the API from a browser. The page quotes each fact's source message from `docs/messages.json`, a copy of the scenario's messages that a test keeps equal to them.
 
 Then `docker compose up -d --build` starts it, and `git pull` with the same command updates it. The firewall opens ports 80 and 443; Postgres listens only on the VM itself. Building the image on the VM took over 10 minutes and peaked at 642 MB of memory; running, the three containers leave about 290 MB free, with 150 MB in swap.
 
 The demo tenant was seeded from a laptop through an SSH tunnel to the VM's Postgres, so the Anthropic key never reached the VM:
 
 ```sh
-gcloud compute ssh twotdb -- -N -L 15432:127.0.0.1:5432 &
-TWO_TDB_DATABASE_URL=postgresql://two_tdb_app:...@127.0.0.1:15432/two_tdb \
+gcloud compute ssh <vm> -- -N -L 15432:127.0.0.1:5432 &
+PY2TDB_DATABASE_URL=postgresql://pg2tdb_app:...@127.0.0.1:15432/pg2tdb \
     ANTHROPIC_API_KEY=... uv run python -m evaluation.seed 1
 ```
 
@@ -131,7 +131,7 @@ docker compose up -d --wait db
 uv run pytest
 ```
 
-The tests drop and recreate a database named `two_tdb_test` on that server, and run the agent against a scripted model, so they need no API key.
+The tests drop and recreate a database named `pg2tdb_test` on that server, and run the agent against a scripted model, so they need no API key.
 
 CI runs the same tests on pushes to `main` and on pull requests, after `uv run ruff format --check .`, `uv run ruff check .` and `uv run pyright`.
 

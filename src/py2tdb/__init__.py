@@ -1,4 +1,4 @@
-from two_tdb.model import (
+from py2tdb.model import (
     Added,
     Assertion,
     Changed,
@@ -13,7 +13,7 @@ from two_tdb.model import (
     Value,
     Write,
 )
-from two_tdb.store import Reader, Snapshot, Store, install
+from py2tdb.store import Reader, Snapshot, Store, install
 
 __all__ = [
     "Added",

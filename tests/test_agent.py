@@ -6,8 +6,8 @@ from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from pydantic import Field
 
-from two_tdb import agent
-from two_tdb.agent import Message
+from py2tdb import agent
+from py2tdb.agent import Message
 
 SENT = datetime.fromisoformat("2026-03-05T10:00:00+05:30")
 _ids = count()

@@ -7,7 +7,7 @@ RUN uv sync --locked --no-dev --no-install-project
 COPY README.md ./
 COPY src ./src
 RUN uv sync --locked --no-dev
-RUN /app/.venv/bin/python -c 'from two_tdb.embedding import Embedder; Embedder()'
+RUN /app/.venv/bin/python -c 'from py2tdb.embedding import Embedder; Embedder()'
 USER 1000
 EXPOSE 8000
-CMD ["/app/.venv/bin/uvicorn", "--factory", "two_tdb.api:from_environment", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/.venv/bin/uvicorn", "--factory", "py2tdb.api:from_environment", "--host", "0.0.0.0", "--port", "8000"]

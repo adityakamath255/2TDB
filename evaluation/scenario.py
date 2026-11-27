@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-from two_tdb.agent import Message
+from py2tdb.agent import Message
 
 
 def _at(text: str) -> datetime:

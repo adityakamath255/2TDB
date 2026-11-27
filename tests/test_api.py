@@ -2,7 +2,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from two_tdb.api import create_app
+from py2tdb.api import create_app
 
 
 def auth(key: str) -> dict[str, str]:

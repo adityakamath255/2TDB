@@ -10,8 +10,8 @@ from collections.abc import Sequence
 
 import anthropic
 
-from two_tdb.agent import MODEL, Message, Reply
-from two_tdb.store import Embed
+from py2tdb.agent import MODEL, Message, Reply
+from py2tdb.store import Embed
 
 RETRIEVED = 5
 

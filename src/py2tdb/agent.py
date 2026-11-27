@@ -25,14 +25,14 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel
 
-from two_tdb.model import (
+from py2tdb.model import (
     InvalidInput,
     RecordedAssertion,
     StoreError,
     Value,
     Write,
 )
-from two_tdb.store import Reader, Snapshot, Store
+from py2tdb.store import Reader, Snapshot, Store
 
 MODEL = "claude-haiku-5-5"
 TOOL_CALLS_PER_MESSAGE = 8
