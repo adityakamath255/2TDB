@@ -47,7 +47,7 @@ CREATE TABLE changes (
     float_value double precision
         CHECK (float_value NOT IN ('NaN', 'Infinity', '-Infinity')),
     str_value   text,
-    -- the "key: value" text embedded by two_tdb.embedding.MODEL; none for a deletion
+    -- "key: value" embedded by two_tdb.embedding.MODEL; null for a deletion
     embedding   vector(384) CHECK ((kind = 'delete') = (embedding IS NULL)),
     PRIMARY KEY (tenant, key, valid, seq),
     FOREIGN KEY (tenant, seq) REFERENCES events,
@@ -82,16 +82,22 @@ LANGUAGE plpgsql AS $$
 DECLARE
     key text := '2tdb_' || encode(gen_random_bytes(32), 'hex');
 BEGIN
-    INSERT INTO api_keys (tenant, writable, hash) VALUES (tenant, writable, sha256(convert_to(key, 'UTF8')));
+    INSERT INTO api_keys (tenant, writable, hash)
+    VALUES (tenant, writable, sha256(convert_to(key, 'UTF8')));
     RETURN key;
 END
 $$;
 
 REVOKE EXECUTE ON FUNCTION create_api_key FROM PUBLIC;
 
-CREATE FUNCTION api_key_tenant(key text, OUT tenant bigint, OUT writable boolean)
+CREATE FUNCTION api_key_tenant(
+    key text, OUT tenant bigint, OUT writable boolean
+)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
-RETURN (SELECT (k.tenant, k.writable) FROM api_keys k WHERE k.hash = sha256(convert_to(key, 'UTF8')));
+RETURN (
+    SELECT (k.tenant, k.writable) FROM api_keys k
+    WHERE k.hash = sha256(convert_to(key, 'UTF8'))
+);
 
 REVOKE EXECUTE ON FUNCTION api_key_tenant FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION api_key_tenant TO two_tdb_app;
