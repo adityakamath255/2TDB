@@ -1,8 +1,9 @@
 services:
   db:
     image: pgvector/pgvector:0.8.7-pg18-trixie
+    restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: two_tdb
       TWO_TDB_APP_PASSWORD: ${TWO_TDB_APP_PASSWORD:-two_tdb_app}
     ports:
@@ -20,6 +21,7 @@ services:
 
   app:
     build: .
+    restart: unless-stopped
     environment:
       TWO_TDB_DATABASE_URL: postgresql://two_tdb_app:${TWO_TDB_APP_PASSWORD:-two_tdb_app}@db/two_tdb
     ports:
