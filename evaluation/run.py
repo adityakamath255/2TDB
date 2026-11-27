@@ -14,7 +14,7 @@ import os
 import re
 import statistics
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -41,6 +41,16 @@ RESULTS = Path(__file__).parent / "results"
 INPUT_PRICE, OUTPUT_PRICE = 0.10, 0.50
 
 type Responder = Callable[[Message], Reply]
+
+
+def _dollars(usage: Iterable[Result] | Iterable[Ingest]) -> float:
+    return (
+        sum(
+            u.input_tokens * INPUT_PRICE + u.output_tokens * OUTPUT_PRICE
+            for u in usage
+        )
+        / 1e6
+    )
 
 
 def _normalize(text: str) -> str:
@@ -190,23 +200,9 @@ def report(ingests: list[Ingest], results: list[Result]) -> str:
         for kind in kinds + [None]:
             subset = [r for r in mine if kind is None or r.kind == kind]
             cells.append(f"{sum(r.correct for r in subset)}/{len(subset)}")
-        cost = (
-            sum(
-                r.input_tokens * INPUT_PRICE + r.output_tokens * OUTPUT_PRICE
-                for r in mine
-            )
-            / 1e6
-            / len(mine)
-        )
+        cost = _dollars(mine) / len(mine)
         ingest = [i for i in ingests if i.system == system]
-        ingest_cost = (
-            sum(
-                i.input_tokens * INPUT_PRICE + i.output_tokens * OUTPUT_PRICE
-                for i in ingest
-            )
-            / 1e6
-            / len(ingest)
-        )
+        ingest_cost = _dollars(ingest) / len(ingest)
         seconds = statistics.median(r.seconds for r in mine)
         lines.append(
             f"| {system} | "
@@ -214,8 +210,8 @@ def report(ingests: list[Ingest], results: list[Result]) -> str:
             + f" | {seconds:.1f} | {cost:.5f} | {ingest_cost:.4f} |"
         )
     lines.append(
-        f"\nCounts are correct answers over {repeats} repeats; "
-        "costs are per repeat at "
+        f"\nCounts are correct answers over {repeats} repeats; ingest "
+        "costs are per repeat; prices are "
         f"${INPUT_PRICE}/${OUTPUT_PRICE} per million input/output tokens."
     )
     return "\n".join(lines)
