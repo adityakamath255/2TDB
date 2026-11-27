@@ -88,12 +88,12 @@ Each assertion's text (`key: value`) is embedded with all-MiniLM-L6-v2 when it i
 
 The evaluation feeds 26 messages from one customer, January to October 2026, to the agent and to a baseline that stores the raw messages and answers from the five closest by meaning. The messages include changes, back-dated and future-dated facts, and eight corrections. Both then answer 24 questions: about current facts, facts at an earlier date, and what the records said before a correction. Answers are compared exactly after normalising case, spacing and punctuation.
 
-| System | current | past | corrected | All | Median s per question | $ per question |
-|---|---|---|---|---|---|---|
-| 2TDB agent | 24/24 | 24/24 | 24/24 | 72/72 | 2.0 | 0.00048 |
-| RAG baseline | 24/24 | 15/24 | 18/24 | 57/72 | 1.0 | 0.00008 |
+| System | current | past | corrected | All | Median s per question | $ per question | $ to ingest |
+|---|---|---|---|---|---|---|---|
+| 2TDB agent | 24/24 | 24/24 | 24/24 | 72/72 | 2.0 | 0.00048 | 0.0158 |
+| RAG baseline | 24/24 | 15/24 | 18/24 | 57/72 | 1.0 | 0.00008 | 0.0000 |
 
-Counts are over three repeats (26 Nov 2026). Every baseline miss was "unknown" on one of five questions whose answers sit in January messages that five-message retrieval never returned. Run it with:
+Counts are over three repeats (26 Nov 2026). Ingesting is reading the 26 messages, once per repeat: the agent runs the model on each one, while the baseline only embeds them on the local model. Every baseline miss was "unknown" on one of five questions whose answers sit in January messages that five-message retrieval never returned. Run it with:
 
 ```sh
 docker compose up -d --wait db
