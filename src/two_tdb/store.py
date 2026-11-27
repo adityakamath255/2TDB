@@ -275,7 +275,7 @@ class Store(Reader):
                 FROM events
                 RETURNING seq, committed_at
             """).fetchall()
-            latest = {
+            last_writes = {
                 (
                     write.key,
                     committed_at
@@ -284,28 +284,18 @@ class Store(Reader):
                 ): (write.value, vector)
                 for write, vector in embedded
             }
-            keys, valids, kinds, bools, ints, floats, strs, vectors = (
-                list(column)
-                for column in zip(
-                    *(
-                        (key, valid, *_encode(value), vector)
-                        for (key, valid), (value, vector) in latest.items()
-                    ),
-                    strict=True,
-                )
-            )
-            db.execute(t"""
+            db.cursor().executemany(
+                """
                 INSERT INTO changes
                     (seq, key, valid, kind, bool_value, int_value, float_value,
                      str_value, embedding)
-                SELECT {event_id}, k, v, kind, b, i, f, s, e::vector
-                FROM unnest(
-                    {keys}::text[], {valids}::timestamptz[],
-                    {kinds}::value_kind[], {bools}::boolean[],
-                    {ints}::bigint[], {floats}::float8[], {strs}::text[],
-                    {vectors}::text[]
-                ) AS u (k, v, kind, b, i, f, s, e)
-            """)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                [
+                    (event_id, key, valid, *_encode(value), vector)
+                    for (key, valid), (value, vector) in last_writes.items()
+                ],
+            )
         return event_id
 
 
