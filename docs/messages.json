@@ -1,15 +1,15 @@
 {
  "msg-01": {
   "sent_at": "2026-01-10T10:00:00+05:30",
-  "text": "Hi, I'm Asha Rao from Rao Textiles. I just signed up and we're on the free plan for now. I live in Mumbai."
+  "text": "Hi, I'm writing from Halliard & Pike. We just signed up and we're on the free plan for now. We're based in Mumbai."
  },
  "msg-02": {
   "sent_at": "2026-01-12T11:30:00+05:30",
-  "text": "Best way to reach me is email: asha.rao@example.com"
+  "text": "Best way to reach us is email: opps@halyardpike.example"
  },
  "msg-03": {
   "sent_at": "2026-01-13T09:15:00+05:30",
-  "text": "Sorry, typo in my email. It's asha.rao@example.in"
+  "text": "Sorry, typo in our email. It's ops@halyardpike.example"
  },
  "msg-04": {
   "sent_at": "2026-02-03T16:00:00+05:30",
@@ -21,7 +21,7 @@
  },
  "msg-06": {
   "sent_at": "2026-02-21T10:00:00+05:30",
-  "text": "Could you fix my name in your records? It's spelled Aasha, A-A-S-H-A."
+  "text": "Could you fix our company name in your records? It's Halyard & Pike, with a Y: H-A-L-Y-A-R-D."
  },
  "msg-07": {
   "sent_at": "2026-02-22T18:45:00+05:30",
@@ -37,7 +37,7 @@
  },
  "msg-10": {
   "sent_at": "2026-04-02T15:10:00+05:30",
-  "text": "We moved the office to Pune at the end of March, and I live there now too."
+  "text": "We moved our office to Pune at the end of March, and the whole team is there now."
  },
  "msg-11": {
   "sent_at": "2026-04-15T11:00:00+05:30",
@@ -85,11 +85,11 @@
  },
  "msg-22": {
   "sent_at": "2026-09-30T12:40:00+05:30",
-  "text": "Could you send invoices in Marathi? I prefer Marathi for documents."
+  "text": "Could you email invoices as PDFs? The paper copies keep getting lost."
  },
  "msg-23": {
   "sent_at": "2026-10-12T10:15:00+05:30",
-  "text": "My new phone number is +91 98450 12345."
+  "text": "Our new phone number is +91 05550 12345."
  },
  "msg-24": {
   "sent_at": "2026-10-20T14:00:00+05:30",
@@ -97,7 +97,7 @@
  },
  "msg-25": {
   "sent_at": "2026-10-25T09:30:00+05:30",
-  "text": "The phone number I gave was wrong. It's +91 98450 54321."
+  "text": "The phone number we gave was wrong. It's +91 05550 54321."
  },
  "msg-26": {
   "sent_at": "2026-10-28T17:00:00+05:30",

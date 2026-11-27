@@ -15,7 +15,7 @@ curl -H "Authorization: Bearer $KEY" "https://2tdb.duckdns.org/history?key=email
 curl -H "Authorization: Bearer $KEY" "https://2tdb.duckdns.org/value?key=city&valid_at=2026-03-01T00:00:00Z"
 ```
 
-Valid times follow the messages' dates; commit times are when the seed ran, on 27 November 2026.
+The customer and its contact details are invented. Valid times follow the messages' dates; commit times are when the seed ran, on 27 November 2026.
 
 ## Usage
 
@@ -90,10 +90,10 @@ The evaluation feeds 26 messages from one customer, January to October 2026, to 
 
 | System | current | past | corrected | All | Median s per question | $ per question | $ to ingest |
 |---|---|---|---|---|---|---|---|
-| 2TDB agent | 24/24 | 24/24 | 24/24 | 72/72 | 2.0 | 0.00048 | 0.0158 |
-| RAG baseline | 24/24 | 15/24 | 18/24 | 57/72 | 1.0 | 0.00008 | 0.0000 |
+| 2TDB agent | 24/24 | 24/24 | 24/24 | 72/72 | 1.7 | 0.00048 | 0.0158 |
+| RAG baseline | 24/24 | 12/24 | 21/24 | 57/72 | 1.0 | 0.00009 | 0.0000 |
 
-Counts are over three repeats (26 Nov 2026). Ingesting is reading the 26 messages, once per repeat: the agent runs the model on each one, while the baseline only embeds them on the local model. Every baseline miss was "unknown" on one of five questions whose answers sit in January messages that five-message retrieval never returned. Run it with:
+Counts are over three repeats (27 Nov 2026). Ingesting is reading the 26 messages, once per repeat: the agent runs the model on each one, while the baseline only embeds them on the local model. Every baseline miss was "unknown" on one of five questions, in all three repeats: for each, five-message retrieval leaves out a message the answer needs, in three of them the first message. Run it with:
 
 ```sh
 docker compose up -d --wait db

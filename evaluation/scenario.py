@@ -21,16 +21,19 @@ _MESSAGES = [
     (
         "2026-01-10T10:00",
         (
-            "Hi, I'm Asha Rao from Rao Textiles. "
-            "I just signed up and we're on the free plan for now. "
-            "I live in Mumbai."
+            "Hi, I'm writing from Halliard & Pike. "
+            "We just signed up and we're on the free plan for now. "
+            "We're based in Mumbai."
         ),
     ),
     (
         "2026-01-12T11:30",
-        "Best way to reach me is email: asha.rao@example.com",
+        "Best way to reach us is email: opps@halyardpike.example",
     ),
-    ("2026-01-13T09:15", "Sorry, typo in my email. It's asha.rao@example.in"),
+    (
+        "2026-01-13T09:15",
+        "Sorry, typo in our email. It's ops@halyardpike.example",
+    ),
     (
         "2026-02-03T16:00",
         "We upgraded to the pro plan today, with 5 seats, billed monthly.",
@@ -39,8 +42,8 @@ _MESSAGES = [
     (
         "2026-02-21T10:00",
         (
-            "Could you fix my name in your records? "
-            "It's spelled Aasha, A-A-S-H-A."
+            "Could you fix our company name in your records? "
+            "It's Halyard & Pike, with a Y: H-A-L-Y-A-R-D."
         ),
     ),
     (
@@ -67,8 +70,8 @@ _MESSAGES = [
     (
         "2026-04-02T15:10",
         (
-            "We moved the office to Pune at the end of March, and I live "
-            "there now too."
+            "We moved our office to Pune at the end of March, and the "
+            "whole team is there now."
         ),
     ),
     (
@@ -102,16 +105,19 @@ _MESSAGES = [
     ),
     (
         "2026-09-30T12:40",
-        "Could you send invoices in Marathi? I prefer Marathi for documents.",
+        (
+            "Could you email invoices as PDFs? "
+            "The paper copies keep getting lost."
+        ),
     ),
-    ("2026-10-12T10:15", "My new phone number is +91 98450 12345."),
+    ("2026-10-12T10:15", "Our new phone number is +91 05550 12345."),
     (
         "2026-10-20T14:00",
         "Also, we relocated again, to Bengaluru, two weeks ago.",
     ),
     (
         "2026-10-25T09:30",
-        "The phone number I gave was wrong. It's +91 98450 54321.",
+        "The phone number we gave was wrong. It's +91 05550 54321.",
     ),
     ("2026-10-28T17:00", "Thanks for all the help this year!"),
 ]
@@ -144,7 +150,7 @@ class Question:
 
 
 _QUESTIONS: list[tuple[Kind, str, str]] = [
-    ("current", "Which city does the customer live in?", "Bengaluru"),
+    ("current", "Which city is the customer based in?", "Bengaluru"),
     ("current", "Which plan is the customer on?", "enterprise"),
     (
         "current",
@@ -178,8 +184,8 @@ _QUESTIONS: list[tuple[Kind, str, str]] = [
         "WhatsApp",
     ),
     ("current", "How does the customer pay?", "UPI"),
-    ("past", "Which city did the customer live in on 2026-03-15?", "Mumbai"),
-    ("past", "Which city did the customer live in on 2026-05-01?", "Pune"),
+    ("past", "Which city was the customer based in on 2026-03-15?", "Mumbai"),
+    ("past", "Which city was the customer based in on 2026-05-01?", "Pune"),
     ("past", "Which plan was the customer on on 2026-01-20?", "free"),
     ("past", "Which plan was the customer on on 2026-09-20?", "pro"),
     (
@@ -236,7 +242,7 @@ _QUESTIONS: list[tuple[Kind, str, str]] = [
             "Before the customer corrected it, what phone number did we have "
             "on file?"
         ),
-        "+91 98450 12345",
+        "+91 05550 12345",
     ),
     (
         "corrected",
@@ -249,10 +255,10 @@ _QUESTIONS: list[tuple[Kind, str, str]] = [
     (
         "corrected",
         (
-            "Before the customer corrected it, how was the customer's name "
-            "spelled in our records?"
+            "Before the customer corrected it, how was the customer's "
+            "company name spelled in our records?"
         ),
-        "Asha Rao",
+        "Halliard & Pike",
     ),
     (
         "corrected",
@@ -260,7 +266,7 @@ _QUESTIONS: list[tuple[Kind, str, str]] = [
             "Before the customer corrected it, what email address did we have "
             "on file?"
         ),
-        "asha.rao@example.com",
+        "opps@halyardpike.example",
     ),
     (
         "corrected",

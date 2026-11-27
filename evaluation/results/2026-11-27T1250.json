@@ -3,8 +3,8 @@
   {
    "system": "2TDB agent",
    "repeat": 1,
-   "input_tokens": 124269,
-   "output_tokens": 6771
+   "input_tokens": 125595,
+   "output_tokens": 7153
   },
   {
    "system": "RAG baseline",
@@ -15,8 +15,8 @@
   {
    "system": "2TDB agent",
    "repeat": 2,
-   "input_tokens": 123621,
-   "output_tokens": 7246
+   "input_tokens": 121731,
+   "output_tokens": 6484
   },
   {
    "system": "RAG baseline",
@@ -27,8 +27,8 @@
   {
    "system": "2TDB agent",
    "repeat": 3,
-   "input_tokens": 122687,
-   "output_tokens": 6843
+   "input_tokens": 125088,
+   "output_tokens": 6910
   },
   {
    "system": "RAG baseline",
@@ -45,8 +45,8 @@
    "kind": "current",
    "answer": "Bengaluru",
    "correct": true,
-   "seconds": 2.031229033000045,
-   "input_tokens": 3954,
+   "seconds": 1.5912672600024962,
+   "input_tokens": 3970,
    "output_tokens": 55
   },
   {
@@ -56,9 +56,9 @@
    "kind": "current",
    "answer": "enterprise",
    "correct": true,
-   "seconds": 1.5993528530000276,
-   "input_tokens": 3992,
-   "output_tokens": 93
+   "seconds": 1.887160103993665,
+   "input_tokens": 3969,
+   "output_tokens": 54
   },
   {
    "system": "2TDB agent",
@@ -67,9 +67,9 @@
    "kind": "current",
    "answer": "11",
    "correct": true,
-   "seconds": 1.396286635000024,
-   "input_tokens": 3966,
-   "output_tokens": 51
+   "seconds": 1.6662748099988676,
+   "input_tokens": 4021,
+   "output_tokens": 90
   },
   {
    "system": "2TDB agent",
@@ -78,8 +78,8 @@
    "kind": "current",
    "answer": "annual",
    "correct": true,
-   "seconds": 1.4672350120000601,
-   "input_tokens": 3983,
+   "seconds": 1.5116725719999522,
+   "input_tokens": 3999,
    "output_tokens": 56
   },
   {
@@ -89,8 +89,8 @@
    "kind": "current",
    "answer": "15",
    "correct": true,
-   "seconds": 2.7538324800000282,
-   "input_tokens": 4012,
+   "seconds": 1.651382417003333,
+   "input_tokens": 4028,
    "output_tokens": 93
   },
   {
@@ -100,8 +100,8 @@
    "kind": "current",
    "answer": "2027-04-01",
    "correct": true,
-   "seconds": 1.458943836000003,
-   "input_tokens": 3992,
+   "seconds": 1.5157297069963533,
+   "input_tokens": 4008,
    "output_tokens": 59
   },
   {
@@ -111,8 +111,8 @@
    "kind": "current",
    "answer": "WhatsApp",
    "correct": true,
-   "seconds": 2.840691160999995,
-   "input_tokens": 3974,
+   "seconds": 1.5640009380003903,
+   "input_tokens": 3990,
    "output_tokens": 59
   },
   {
@@ -122,8 +122,8 @@
    "kind": "current",
    "answer": "UPI",
    "correct": true,
-   "seconds": 1.526244858000041,
-   "input_tokens": 3950,
+   "seconds": 1.6165193130000262,
+   "input_tokens": 3966,
    "output_tokens": 55
   },
   {
@@ -133,8 +133,8 @@
    "kind": "past",
    "answer": "Mumbai",
    "correct": true,
-   "seconds": 1.5879106510000156,
-   "input_tokens": 4008,
+   "seconds": 1.7131589979981072,
+   "input_tokens": 4024,
    "output_tokens": 93
   },
   {
@@ -144,8 +144,8 @@
    "kind": "past",
    "answer": "Pune",
    "correct": true,
-   "seconds": 1.6880758519999972,
-   "input_tokens": 4006,
+   "seconds": 1.682932843999879,
+   "input_tokens": 4022,
    "output_tokens": 91
   },
   {
@@ -155,8 +155,8 @@
    "kind": "past",
    "answer": "free",
    "correct": true,
-   "seconds": 2.1334918139999672,
-   "input_tokens": 4005,
+   "seconds": 1.6598017700016499,
+   "input_tokens": 4021,
    "output_tokens": 90
   },
   {
@@ -166,8 +166,8 @@
    "kind": "past",
    "answer": "pro",
    "correct": true,
-   "seconds": 1.600421818999962,
-   "input_tokens": 4006,
+   "seconds": 1.7297972539963666,
+   "input_tokens": 4022,
    "output_tokens": 91
   },
   {
@@ -177,8 +177,8 @@
    "kind": "past",
    "answer": "5",
    "correct": true,
-   "seconds": 2.3082257300000038,
-   "input_tokens": 4021,
+   "seconds": 1.676247808005428,
+   "input_tokens": 4037,
    "output_tokens": 90
   },
   {
@@ -188,8 +188,8 @@
    "kind": "past",
    "answer": "monthly",
    "correct": true,
-   "seconds": 1.5889944519999517,
-   "input_tokens": 4039,
+   "seconds": 1.574072959003388,
+   "input_tokens": 4055,
    "output_tokens": 96
   },
   {
@@ -199,8 +199,8 @@
    "kind": "past",
    "answer": "email",
    "correct": true,
-   "seconds": 1.6375512619999881,
-   "input_tokens": 4024,
+   "seconds": 1.687372978994972,
+   "input_tokens": 4040,
    "output_tokens": 93
   },
   {
@@ -210,8 +210,8 @@
    "kind": "past",
    "answer": "No",
    "correct": true,
-   "seconds": 1.79147664300001,
-   "input_tokens": 4026,
+   "seconds": 3.43027281799732,
+   "input_tokens": 4042,
    "output_tokens": 93
   },
   {
@@ -221,9 +221,9 @@
    "kind": "corrected",
    "answer": "2027-03-01",
    "correct": true,
-   "seconds": 2.0223365909999984,
-   "input_tokens": 4163,
-   "output_tokens": 188
+   "seconds": 2.342044272001658,
+   "input_tokens": 4179,
+   "output_tokens": 224
   },
   {
    "system": "2TDB agent",
@@ -232,20 +232,20 @@
    "kind": "corrected",
    "answer": "10",
    "correct": true,
-   "seconds": 2.370136947999981,
-   "input_tokens": 4165,
-   "output_tokens": 223
+   "seconds": 2.548456142001669,
+   "input_tokens": 4201,
+   "output_tokens": 234
   },
   {
    "system": "2TDB agent",
    "repeat": 1,
    "question": "q-19",
    "kind": "corrected",
-   "answer": "+91 98450 12345",
+   "answer": "+91 05550 12345",
    "correct": true,
-   "seconds": 2.184213545000034,
-   "input_tokens": 4145,
-   "output_tokens": 187
+   "seconds": 2.814725449999969,
+   "input_tokens": 4161,
+   "output_tokens": 292
   },
   {
    "system": "2TDB agent",
@@ -254,31 +254,31 @@
    "kind": "corrected",
    "answer": "12",
    "correct": true,
-   "seconds": 2.928675875000067,
-   "input_tokens": 4260,
-   "output_tokens": 312
+   "seconds": 7.143838555995899,
+   "input_tokens": 4259,
+   "output_tokens": 336
   },
   {
    "system": "2TDB agent",
    "repeat": 1,
    "question": "q-21",
    "kind": "corrected",
-   "answer": "Asha Rao",
+   "answer": "Halliard & Pike",
    "correct": true,
-   "seconds": 2.08374637299994,
-   "input_tokens": 4136,
-   "output_tokens": 194
+   "seconds": 1.9187485889997333,
+   "input_tokens": 4166,
+   "output_tokens": 164
   },
   {
    "system": "2TDB agent",
    "repeat": 1,
    "question": "q-22",
    "kind": "corrected",
-   "answer": "asha.rao@example.com",
+   "answer": "opps@halyardpike.example",
    "correct": true,
-   "seconds": 2.4391777619999857,
-   "input_tokens": 4142,
-   "output_tokens": 129
+   "seconds": 2.425887535995571,
+   "input_tokens": 4161,
+   "output_tokens": 243
   },
   {
    "system": "2TDB agent",
@@ -287,9 +287,9 @@
    "kind": "corrected",
    "answer": "operations manager",
    "correct": true,
-   "seconds": 2.387688429000036,
-   "input_tokens": 4132,
-   "output_tokens": 238
+   "seconds": 3.2351148899979307,
+   "input_tokens": 6701,
+   "output_tokens": 318
   },
   {
    "system": "2TDB agent",
@@ -298,9 +298,9 @@
    "kind": "corrected",
    "answer": "card",
    "correct": true,
-   "seconds": 2.279926646999911,
-   "input_tokens": 4137,
-   "output_tokens": 195
+   "seconds": 2.4036774309934117,
+   "input_tokens": 4153,
+   "output_tokens": 227
   },
   {
    "system": "RAG baseline",
@@ -309,9 +309,9 @@
    "kind": "current",
    "answer": "Bengaluru",
    "correct": true,
-   "seconds": 0.6080914039999925,
-   "input_tokens": 380,
-   "output_tokens": 8
+   "seconds": 0.9918737020052504,
+   "input_tokens": 370,
+   "output_tokens": 95
   },
   {
    "system": "RAG baseline",
@@ -320,9 +320,9 @@
    "kind": "current",
    "answer": "Enterprise",
    "correct": true,
-   "seconds": 0.9917162760000338,
-   "input_tokens": 367,
-   "output_tokens": 91
+   "seconds": 0.9430182929936564,
+   "input_tokens": 365,
+   "output_tokens": 74
   },
   {
    "system": "RAG baseline",
@@ -331,9 +331,9 @@
    "kind": "current",
    "answer": "11",
    "correct": true,
-   "seconds": 1.0762881360000165,
-   "input_tokens": 364,
-   "output_tokens": 73
+   "seconds": 1.049916841002414,
+   "input_tokens": 352,
+   "output_tokens": 112
   },
   {
    "system": "RAG baseline",
@@ -342,9 +342,9 @@
    "kind": "current",
    "answer": "annual",
    "correct": true,
-   "seconds": 1.1947492189999593,
+   "seconds": 0.96889110399934,
    "input_tokens": 359,
-   "output_tokens": 132
+   "output_tokens": 90
   },
   {
    "system": "RAG baseline",
@@ -353,7 +353,7 @@
    "kind": "current",
    "answer": "15",
    "correct": true,
-   "seconds": 0.6606441470000846,
+   "seconds": 0.5978476230011438,
    "input_tokens": 352,
    "output_tokens": 3
   },
@@ -364,9 +364,9 @@
    "kind": "current",
    "answer": "2027-04-01",
    "correct": true,
-   "seconds": 1.5657760359999884,
+   "seconds": 1.5460458480010857,
    "input_tokens": 373,
-   "output_tokens": 243
+   "output_tokens": 197
   },
   {
    "system": "RAG baseline",
@@ -375,9 +375,9 @@
    "kind": "current",
    "answer": "WhatsApp",
    "correct": true,
-   "seconds": 0.8336221929999965,
-   "input_tokens": 343,
-   "output_tokens": 58
+   "seconds": 0.9064123880016268,
+   "input_tokens": 345,
+   "output_tokens": 74
   },
   {
    "system": "RAG baseline",
@@ -386,7 +386,7 @@
    "kind": "current",
    "answer": "UPI",
    "correct": true,
-   "seconds": 0.6723032169999215,
+   "seconds": 0.6463410099968314,
    "input_tokens": 350,
    "output_tokens": 5
   },
@@ -397,20 +397,20 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.2359564530000853,
-   "input_tokens": 371,
-   "output_tokens": 156
+   "seconds": 0.8672379149938934,
+   "input_tokens": 361,
+   "output_tokens": 68
   },
   {
    "system": "RAG baseline",
    "repeat": 1,
    "question": "q-10",
    "kind": "past",
-   "answer": "Pune",
-   "correct": true,
-   "seconds": 1.3229339740000796,
+   "answer": "unknown",
+   "correct": false,
+   "seconds": 2.0179669270000886,
    "input_tokens": 361,
-   "output_tokens": 155
+   "output_tokens": 71
   },
   {
    "system": "RAG baseline",
@@ -419,9 +419,9 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 0.8441659640000125,
+   "seconds": 0.829625799000496,
    "input_tokens": 377,
-   "output_tokens": 58
+   "output_tokens": 57
   },
   {
    "system": "RAG baseline",
@@ -430,9 +430,9 @@
    "kind": "past",
    "answer": "Pro",
    "correct": true,
-   "seconds": 0.8997745630000509,
-   "input_tokens": 377,
-   "output_tokens": 69
+   "seconds": 1.0100055400034762,
+   "input_tokens": 385,
+   "output_tokens": 99
   },
   {
    "system": "RAG baseline",
@@ -441,9 +441,9 @@
    "kind": "past",
    "answer": "5",
    "correct": true,
-   "seconds": 1.5711079369999652,
-   "input_tokens": 346,
-   "output_tokens": 144
+   "seconds": 1.3867685579971294,
+   "input_tokens": 360,
+   "output_tokens": 168
   },
   {
    "system": "RAG baseline",
@@ -452,9 +452,9 @@
    "kind": "past",
    "answer": "monthly",
    "correct": true,
-   "seconds": 0.9801814060000424,
+   "seconds": 1.0333316329997615,
    "input_tokens": 378,
-   "output_tokens": 73
+   "output_tokens": 81
   },
   {
    "system": "RAG baseline",
@@ -463,9 +463,9 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.055012660999978,
+   "seconds": 1.0167037710052682,
    "input_tokens": 369,
-   "output_tokens": 5
+   "output_tokens": 73
   },
   {
    "system": "RAG baseline",
@@ -474,9 +474,9 @@
    "kind": "past",
    "answer": "No",
    "correct": true,
-   "seconds": 0.7765677190000133,
-   "input_tokens": 362,
-   "output_tokens": 44
+   "seconds": 0.7840055089982343,
+   "input_tokens": 376,
+   "output_tokens": 51
   },
   {
    "system": "RAG baseline",
@@ -485,9 +485,9 @@
    "kind": "corrected",
    "answer": "2027-03-01",
    "correct": true,
-   "seconds": 0.9056309020000981,
+   "seconds": 1.0550683679975918,
    "input_tokens": 379,
-   "output_tokens": 68
+   "output_tokens": 101
   },
   {
    "system": "RAG baseline",
@@ -496,20 +496,20 @@
    "kind": "corrected",
    "answer": "10",
    "correct": true,
-   "seconds": 0.6485642430000098,
-   "input_tokens": 365,
-   "output_tokens": 3
+   "seconds": 1.123419281000679,
+   "input_tokens": 369,
+   "output_tokens": 78
   },
   {
    "system": "RAG baseline",
    "repeat": 1,
    "question": "q-19",
    "kind": "corrected",
-   "answer": "+91 98450 12345",
+   "answer": "+91 05550 12345",
    "correct": true,
-   "seconds": 1.126690278999945,
-   "input_tokens": 376,
-   "output_tokens": 117
+   "seconds": 0.9966769379971083,
+   "input_tokens": 373,
+   "output_tokens": 102
   },
   {
    "system": "RAG baseline",
@@ -518,9 +518,9 @@
    "kind": "corrected",
    "answer": "12",
    "correct": true,
-   "seconds": 1.3303170430000364,
-   "input_tokens": 386,
-   "output_tokens": 112
+   "seconds": 0.908545566999237,
+   "input_tokens": 374,
+   "output_tokens": 83
   },
   {
    "system": "RAG baseline",
@@ -529,31 +529,31 @@
    "kind": "corrected",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.3930660079998916,
-   "input_tokens": 376,
-   "output_tokens": 163
+   "seconds": 3.026209834999463,
+   "input_tokens": 381,
+   "output_tokens": 485
   },
   {
    "system": "RAG baseline",
    "repeat": 1,
    "question": "q-22",
    "kind": "corrected",
-   "answer": "unknown",
-   "correct": false,
-   "seconds": 1.1670532960000628,
-   "input_tokens": 367,
-   "output_tokens": 111
+   "answer": "opps@halyardpike.example",
+   "correct": true,
+   "seconds": 1.073943874995166,
+   "input_tokens": 381,
+   "output_tokens": 110
   },
   {
    "system": "RAG baseline",
    "repeat": 1,
    "question": "q-23",
    "kind": "corrected",
-   "answer": "Operations manager",
+   "answer": "operations manager",
    "correct": true,
-   "seconds": 1.0241752389999874,
-   "input_tokens": 360,
-   "output_tokens": 93
+   "seconds": 1.2387416339988704,
+   "input_tokens": 373,
+   "output_tokens": 133
   },
   {
    "system": "RAG baseline",
@@ -562,9 +562,9 @@
    "kind": "corrected",
    "answer": "Card",
    "correct": true,
-   "seconds": 1.0241012620000447,
+   "seconds": 1.0418403730000136,
    "input_tokens": 349,
-   "output_tokens": 89
+   "output_tokens": 104
   },
   {
    "system": "2TDB agent",
@@ -573,9 +573,9 @@
    "kind": "current",
    "answer": "Bengaluru",
    "correct": true,
-   "seconds": 2.923878793999961,
-   "input_tokens": 3954,
-   "output_tokens": 55
+   "seconds": 1.6691713000036543,
+   "input_tokens": 4009,
+   "output_tokens": 94
   },
   {
    "system": "2TDB agent",
@@ -584,9 +584,9 @@
    "kind": "current",
    "answer": "enterprise",
    "correct": true,
-   "seconds": 1.5303572100000338,
-   "input_tokens": 3992,
-   "output_tokens": 93
+   "seconds": 2.0519884639943484,
+   "input_tokens": 3969,
+   "output_tokens": 54
   },
   {
    "system": "2TDB agent",
@@ -595,9 +595,9 @@
    "kind": "current",
    "answer": "11",
    "correct": true,
-   "seconds": 1.4023790590000544,
-   "input_tokens": 3966,
-   "output_tokens": 51
+   "seconds": 1.6235339359991485,
+   "input_tokens": 4021,
+   "output_tokens": 90
   },
   {
    "system": "2TDB agent",
@@ -606,8 +606,8 @@
    "kind": "current",
    "answer": "annual",
    "correct": true,
-   "seconds": 1.5155934910000042,
-   "input_tokens": 3983,
+   "seconds": 1.5150437650008826,
+   "input_tokens": 3999,
    "output_tokens": 56
   },
   {
@@ -617,8 +617,8 @@
    "kind": "current",
    "answer": "15",
    "correct": true,
-   "seconds": 1.9461304479999626,
-   "input_tokens": 4012,
+   "seconds": 1.6369420389964944,
+   "input_tokens": 4028,
    "output_tokens": 93
   },
   {
@@ -628,8 +628,8 @@
    "kind": "current",
    "answer": "2027-04-01",
    "correct": true,
-   "seconds": 1.5353876030000038,
-   "input_tokens": 3992,
+   "seconds": 1.685005702995113,
+   "input_tokens": 4008,
    "output_tokens": 59
   },
   {
@@ -639,8 +639,8 @@
    "kind": "current",
    "answer": "WhatsApp",
    "correct": true,
-   "seconds": 1.8614877769999794,
-   "input_tokens": 3974,
+   "seconds": 1.504940124003042,
+   "input_tokens": 3990,
    "output_tokens": 59
   },
   {
@@ -650,8 +650,8 @@
    "kind": "current",
    "answer": "UPI",
    "correct": true,
-   "seconds": 1.464367697000057,
-   "input_tokens": 3950,
+   "seconds": 1.4830074190031155,
+   "input_tokens": 3966,
    "output_tokens": 55
   },
   {
@@ -661,8 +661,8 @@
    "kind": "past",
    "answer": "Mumbai",
    "correct": true,
-   "seconds": 1.5933141430000433,
-   "input_tokens": 4008,
+   "seconds": 1.6636567030000151,
+   "input_tokens": 4024,
    "output_tokens": 93
   },
   {
@@ -672,8 +672,8 @@
    "kind": "past",
    "answer": "Pune",
    "correct": true,
-   "seconds": 1.6996792150000601,
-   "input_tokens": 4006,
+   "seconds": 1.7174302150015137,
+   "input_tokens": 4022,
    "output_tokens": 91
   },
   {
@@ -683,8 +683,8 @@
    "kind": "past",
    "answer": "free",
    "correct": true,
-   "seconds": 2.7012787869999784,
-   "input_tokens": 4005,
+   "seconds": 1.671884263996617,
+   "input_tokens": 4021,
    "output_tokens": 90
   },
   {
@@ -694,8 +694,8 @@
    "kind": "past",
    "answer": "pro",
    "correct": true,
-   "seconds": 1.6611932920000072,
-   "input_tokens": 4006,
+   "seconds": 1.6484831089983345,
+   "input_tokens": 4022,
    "output_tokens": 91
   },
   {
@@ -705,8 +705,8 @@
    "kind": "past",
    "answer": "5",
    "correct": true,
-   "seconds": 2.0781720819999236,
-   "input_tokens": 4021,
+   "seconds": 1.694813506997889,
+   "input_tokens": 4037,
    "output_tokens": 90
   },
   {
@@ -716,8 +716,8 @@
    "kind": "past",
    "answer": "monthly",
    "correct": true,
-   "seconds": 1.5383266459999732,
-   "input_tokens": 4039,
+   "seconds": 1.6311950230010552,
+   "input_tokens": 4055,
    "output_tokens": 96
   },
   {
@@ -727,8 +727,8 @@
    "kind": "past",
    "answer": "email",
    "correct": true,
-   "seconds": 1.684824391999996,
-   "input_tokens": 4024,
+   "seconds": 1.580112793999433,
+   "input_tokens": 4040,
    "output_tokens": 93
   },
   {
@@ -738,8 +738,8 @@
    "kind": "past",
    "answer": "No",
    "correct": true,
-   "seconds": 1.6074688470000638,
-   "input_tokens": 4026,
+   "seconds": 3.204740622997633,
+   "input_tokens": 4042,
    "output_tokens": 93
   },
   {
@@ -749,9 +749,9 @@
    "kind": "corrected",
    "answer": "2027-03-01",
    "correct": true,
-   "seconds": 2.2685543520000238,
-   "input_tokens": 4163,
-   "output_tokens": 231
+   "seconds": 2.1976148120011203,
+   "input_tokens": 4179,
+   "output_tokens": 207
   },
   {
    "system": "2TDB agent",
@@ -760,20 +760,20 @@
    "kind": "corrected",
    "answer": "10",
    "correct": true,
-   "seconds": 2.752492181999969,
-   "input_tokens": 4159,
-   "output_tokens": 303
+   "seconds": 3.0163028679962736,
+   "input_tokens": 4187,
+   "output_tokens": 324
   },
   {
    "system": "2TDB agent",
    "repeat": 2,
    "question": "q-19",
    "kind": "corrected",
-   "answer": "+91 98450 12345",
+   "answer": "+91 05550 12345",
    "correct": true,
-   "seconds": 2.1939442610000697,
-   "input_tokens": 4144,
-   "output_tokens": 184
+   "seconds": 3.050829847998102,
+   "input_tokens": 4161,
+   "output_tokens": 366
   },
   {
    "system": "2TDB agent",
@@ -782,30 +782,30 @@
    "kind": "corrected",
    "answer": "12",
    "correct": true,
-   "seconds": 2.785878096000033,
-   "input_tokens": 4275,
-   "output_tokens": 298
+   "seconds": 5.335546012996929,
+   "input_tokens": 4271,
+   "output_tokens": 313
   },
   {
    "system": "2TDB agent",
    "repeat": 2,
    "question": "q-21",
    "kind": "corrected",
-   "answer": "Asha Rao",
+   "answer": "Halliard & Pike",
    "correct": true,
-   "seconds": 2.366808784,
-   "input_tokens": 4136,
-   "output_tokens": 243
+   "seconds": 2.2927386770024896,
+   "input_tokens": 4167,
+   "output_tokens": 207
   },
   {
    "system": "2TDB agent",
    "repeat": 2,
    "question": "q-22",
    "kind": "corrected",
-   "answer": "asha.rao@example.com",
+   "answer": "opps@halyardpike.example",
    "correct": true,
-   "seconds": 3.4460372439999674,
-   "input_tokens": 4143,
+   "seconds": 2.471639319002861,
+   "input_tokens": 4162,
    "output_tokens": 248
   },
   {
@@ -815,9 +815,9 @@
    "kind": "corrected",
    "answer": "operations manager",
    "correct": true,
-   "seconds": 3.176289327999939,
-   "input_tokens": 6624,
-   "output_tokens": 295
+   "seconds": 2.782936374998826,
+   "input_tokens": 4180,
+   "output_tokens": 312
   },
   {
    "system": "2TDB agent",
@@ -826,9 +826,9 @@
    "kind": "corrected",
    "answer": "card",
    "correct": true,
-   "seconds": 2.16086012400001,
-   "input_tokens": 4137,
-   "output_tokens": 200
+   "seconds": 2.362489874998573,
+   "input_tokens": 4152,
+   "output_tokens": 209
   },
   {
    "system": "RAG baseline",
@@ -837,9 +837,9 @@
    "kind": "current",
    "answer": "Bengaluru",
    "correct": true,
-   "seconds": 0.6841718240000318,
-   "input_tokens": 380,
-   "output_tokens": 8
+   "seconds": 1.1049382310011424,
+   "input_tokens": 370,
+   "output_tokens": 104
   },
   {
    "system": "RAG baseline",
@@ -848,9 +848,9 @@
    "kind": "current",
    "answer": "Enterprise",
    "correct": true,
-   "seconds": 1.0216729110001097,
-   "input_tokens": 367,
-   "output_tokens": 65
+   "seconds": 1.0175533520014142,
+   "input_tokens": 365,
+   "output_tokens": 88
   },
   {
    "system": "RAG baseline",
@@ -859,9 +859,9 @@
    "kind": "current",
    "answer": "11",
    "correct": true,
-   "seconds": 1.4005278000000771,
-   "input_tokens": 364,
-   "output_tokens": 66
+   "seconds": 1.2706254790027742,
+   "input_tokens": 352,
+   "output_tokens": 155
   },
   {
    "system": "RAG baseline",
@@ -870,9 +870,9 @@
    "kind": "current",
    "answer": "annual",
    "correct": true,
-   "seconds": 0.9289917529999911,
+   "seconds": 1.1066276019992074,
    "input_tokens": 359,
-   "output_tokens": 79
+   "output_tokens": 98
   },
   {
    "system": "RAG baseline",
@@ -881,7 +881,7 @@
    "kind": "current",
    "answer": "15",
    "correct": true,
-   "seconds": 0.6403814440000133,
+   "seconds": 0.6051824570022291,
    "input_tokens": 352,
    "output_tokens": 3
   },
@@ -892,9 +892,9 @@
    "kind": "current",
    "answer": "2027-04-01",
    "correct": true,
-   "seconds": 1.7124034139999367,
+   "seconds": 1.5799063939994085,
    "input_tokens": 373,
-   "output_tokens": 249
+   "output_tokens": 243
   },
   {
    "system": "RAG baseline",
@@ -903,9 +903,9 @@
    "kind": "current",
    "answer": "WhatsApp",
    "correct": true,
-   "seconds": 0.8596991379999963,
-   "input_tokens": 343,
-   "output_tokens": 63
+   "seconds": 0.9690040909990785,
+   "input_tokens": 345,
+   "output_tokens": 84
   },
   {
    "system": "RAG baseline",
@@ -914,7 +914,7 @@
    "kind": "current",
    "answer": "UPI",
    "correct": true,
-   "seconds": 0.7047226649999629,
+   "seconds": 0.6203380410006503,
    "input_tokens": 350,
    "output_tokens": 5
   },
@@ -925,20 +925,20 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.1909546470000123,
-   "input_tokens": 371,
-   "output_tokens": 121
+   "seconds": 0.9774473310026224,
+   "input_tokens": 361,
+   "output_tokens": 73
   },
   {
    "system": "RAG baseline",
    "repeat": 2,
    "question": "q-10",
    "kind": "past",
-   "answer": "Pune",
-   "correct": true,
-   "seconds": 1.184943207999936,
+   "answer": "unknown",
+   "correct": false,
+   "seconds": 1.6756639410014031,
    "input_tokens": 361,
-   "output_tokens": 151
+   "output_tokens": 70
   },
   {
    "system": "RAG baseline",
@@ -947,9 +947,9 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 0.920734040999946,
+   "seconds": 0.9548562260024482,
    "input_tokens": 377,
-   "output_tokens": 63
+   "output_tokens": 60
   },
   {
    "system": "RAG baseline",
@@ -958,9 +958,9 @@
    "kind": "past",
    "answer": "Pro",
    "correct": true,
-   "seconds": 0.9252379329999485,
-   "input_tokens": 377,
-   "output_tokens": 83
+   "seconds": 1.07161635599914,
+   "input_tokens": 385,
+   "output_tokens": 88
   },
   {
    "system": "RAG baseline",
@@ -969,9 +969,9 @@
    "kind": "past",
    "answer": "5",
    "correct": true,
-   "seconds": 1.4126236969999582,
-   "input_tokens": 346,
-   "output_tokens": 175
+   "seconds": 1.9355476979981177,
+   "input_tokens": 360,
+   "output_tokens": 273
   },
   {
    "system": "RAG baseline",
@@ -980,9 +980,9 @@
    "kind": "past",
    "answer": "monthly",
    "correct": true,
-   "seconds": 0.8351057920000358,
+   "seconds": 0.8586788770044222,
    "input_tokens": 378,
-   "output_tokens": 65
+   "output_tokens": 53
   },
   {
    "system": "RAG baseline",
@@ -991,9 +991,9 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.1938368940000146,
+   "seconds": 0.6547715699998662,
    "input_tokens": 369,
-   "output_tokens": 51
+   "output_tokens": 5
   },
   {
    "system": "RAG baseline",
@@ -1002,9 +1002,9 @@
    "kind": "past",
    "answer": "No",
    "correct": true,
-   "seconds": 0.8067104919999792,
-   "input_tokens": 362,
-   "output_tokens": 47
+   "seconds": 0.9041059320006752,
+   "input_tokens": 376,
+   "output_tokens": 51
   },
   {
    "system": "RAG baseline",
@@ -1013,9 +1013,9 @@
    "kind": "corrected",
    "answer": "2027-03-01",
    "correct": true,
-   "seconds": 0.7747734160000164,
+   "seconds": 0.9278812449992984,
    "input_tokens": 379,
-   "output_tokens": 73
+   "output_tokens": 70
   },
   {
    "system": "RAG baseline",
@@ -1024,20 +1024,20 @@
    "kind": "corrected",
    "answer": "10",
    "correct": true,
-   "seconds": 0.5750027519999321,
-   "input_tokens": 365,
-   "output_tokens": 3
+   "seconds": 1.2539744090026943,
+   "input_tokens": 369,
+   "output_tokens": 70
   },
   {
    "system": "RAG baseline",
    "repeat": 2,
    "question": "q-19",
    "kind": "corrected",
-   "answer": "+91 98450 12345",
+   "answer": "+91 05550 12345",
    "correct": true,
-   "seconds": 1.0414997729999413,
-   "input_tokens": 376,
-   "output_tokens": 105
+   "seconds": 1.0114020699984394,
+   "input_tokens": 373,
+   "output_tokens": 108
   },
   {
    "system": "RAG baseline",
@@ -1046,9 +1046,9 @@
    "kind": "corrected",
    "answer": "12",
    "correct": true,
-   "seconds": 1.8363593560000027,
-   "input_tokens": 386,
-   "output_tokens": 81
+   "seconds": 1.0675197009986732,
+   "input_tokens": 374,
+   "output_tokens": 112
   },
   {
    "system": "RAG baseline",
@@ -1057,31 +1057,31 @@
    "kind": "corrected",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.3457670550000103,
-   "input_tokens": 376,
-   "output_tokens": 158
+   "seconds": 2.0394471350009553,
+   "input_tokens": 381,
+   "output_tokens": 216
   },
   {
    "system": "RAG baseline",
    "repeat": 2,
    "question": "q-22",
    "kind": "corrected",
-   "answer": "unknown",
-   "correct": false,
-   "seconds": 0.8894703769999524,
-   "input_tokens": 367,
-   "output_tokens": 83
+   "answer": "opps@halyardpike.example",
+   "correct": true,
+   "seconds": 1.4093063850014005,
+   "input_tokens": 381,
+   "output_tokens": 148
   },
   {
    "system": "RAG baseline",
    "repeat": 2,
    "question": "q-23",
    "kind": "corrected",
-   "answer": "Operations manager",
+   "answer": "operations manager",
    "correct": true,
-   "seconds": 0.880834453000034,
-   "input_tokens": 360,
-   "output_tokens": 93
+   "seconds": 0.9663603770022746,
+   "input_tokens": 373,
+   "output_tokens": 79
   },
   {
    "system": "RAG baseline",
@@ -1090,9 +1090,9 @@
    "kind": "corrected",
    "answer": "Card",
    "correct": true,
-   "seconds": 0.9320201590001034,
+   "seconds": 0.9240562039994984,
    "input_tokens": 349,
-   "output_tokens": 86
+   "output_tokens": 100
   },
   {
    "system": "2TDB agent",
@@ -1101,9 +1101,9 @@
    "kind": "current",
    "answer": "Bengaluru",
    "correct": true,
-   "seconds": 2.0034595480000235,
-   "input_tokens": 3954,
-   "output_tokens": 55
+   "seconds": 1.6616085200003,
+   "input_tokens": 4009,
+   "output_tokens": 94
   },
   {
    "system": "2TDB agent",
@@ -1112,9 +1112,9 @@
    "kind": "current",
    "answer": "enterprise",
    "correct": true,
-   "seconds": 1.666894687000081,
-   "input_tokens": 3992,
-   "output_tokens": 93
+   "seconds": 1.9366589010023745,
+   "input_tokens": 3969,
+   "output_tokens": 54
   },
   {
    "system": "2TDB agent",
@@ -1123,8 +1123,8 @@
    "kind": "current",
    "answer": "11",
    "correct": true,
-   "seconds": 1.5881236259999696,
-   "input_tokens": 4005,
+   "seconds": 1.7440125510038342,
+   "input_tokens": 4021,
    "output_tokens": 90
   },
   {
@@ -1134,9 +1134,9 @@
    "kind": "current",
    "answer": "annual",
    "correct": true,
-   "seconds": 1.4399032910000642,
-   "input_tokens": 3983,
-   "output_tokens": 56
+   "seconds": 1.6132555509975646,
+   "input_tokens": 4038,
+   "output_tokens": 95
   },
   {
    "system": "2TDB agent",
@@ -1145,8 +1145,8 @@
    "kind": "current",
    "answer": "15",
    "correct": true,
-   "seconds": 2.2470767319999823,
-   "input_tokens": 4012,
+   "seconds": 1.7010936199949356,
+   "input_tokens": 4028,
    "output_tokens": 93
   },
   {
@@ -1156,8 +1156,8 @@
    "kind": "current",
    "answer": "2027-04-01",
    "correct": true,
-   "seconds": 1.4449220849999165,
-   "input_tokens": 3992,
+   "seconds": 1.5117431730031967,
+   "input_tokens": 4008,
    "output_tokens": 59
   },
   {
@@ -1167,8 +1167,8 @@
    "kind": "current",
    "answer": "WhatsApp",
    "correct": true,
-   "seconds": 1.9331127210000432,
-   "input_tokens": 3974,
+   "seconds": 1.5375932089955313,
+   "input_tokens": 3990,
    "output_tokens": 59
   },
   {
@@ -1178,8 +1178,8 @@
    "kind": "current",
    "answer": "UPI",
    "correct": true,
-   "seconds": 1.639609016999998,
-   "input_tokens": 3950,
+   "seconds": 1.5254130489993258,
+   "input_tokens": 3966,
    "output_tokens": 55
   },
   {
@@ -1189,8 +1189,8 @@
    "kind": "past",
    "answer": "Mumbai",
    "correct": true,
-   "seconds": 1.534928014000002,
-   "input_tokens": 4008,
+   "seconds": 1.6551492680009687,
+   "input_tokens": 4024,
    "output_tokens": 93
   },
   {
@@ -1200,8 +1200,8 @@
    "kind": "past",
    "answer": "Pune",
    "correct": true,
-   "seconds": 1.7823280200000227,
-   "input_tokens": 4006,
+   "seconds": 1.6071377260013833,
+   "input_tokens": 4022,
    "output_tokens": 91
   },
   {
@@ -1211,8 +1211,8 @@
    "kind": "past",
    "answer": "free",
    "correct": true,
-   "seconds": 2.20096045899993,
-   "input_tokens": 4005,
+   "seconds": 1.697096870993846,
+   "input_tokens": 4021,
    "output_tokens": 90
   },
   {
@@ -1222,8 +1222,8 @@
    "kind": "past",
    "answer": "pro",
    "correct": true,
-   "seconds": 1.649293091000004,
-   "input_tokens": 4006,
+   "seconds": 1.6603822089964524,
+   "input_tokens": 4022,
    "output_tokens": 91
   },
   {
@@ -1233,8 +1233,8 @@
    "kind": "past",
    "answer": "5",
    "correct": true,
-   "seconds": 2.352390825000043,
-   "input_tokens": 4021,
+   "seconds": 1.680546809999214,
+   "input_tokens": 4037,
    "output_tokens": 90
   },
   {
@@ -1244,8 +1244,8 @@
    "kind": "past",
    "answer": "monthly",
    "correct": true,
-   "seconds": 1.6014650990000519,
-   "input_tokens": 4039,
+   "seconds": 1.655052751993935,
+   "input_tokens": 4055,
    "output_tokens": 96
   },
   {
@@ -1255,8 +1255,8 @@
    "kind": "past",
    "answer": "email",
    "correct": true,
-   "seconds": 1.5469165270000076,
-   "input_tokens": 4024,
+   "seconds": 1.675747137000144,
+   "input_tokens": 4040,
    "output_tokens": 93
   },
   {
@@ -1266,8 +1266,8 @@
    "kind": "past",
    "answer": "No",
    "correct": true,
-   "seconds": 1.573031506999996,
-   "input_tokens": 4026,
+   "seconds": 3.3085889180001686,
+   "input_tokens": 4042,
    "output_tokens": 93
   },
   {
@@ -1277,9 +1277,9 @@
    "kind": "corrected",
    "answer": "2027-03-01",
    "correct": true,
-   "seconds": 2.204367689000037,
-   "input_tokens": 4163,
-   "output_tokens": 217
+   "seconds": 2.5633317090032506,
+   "input_tokens": 4195,
+   "output_tokens": 267
   },
   {
    "system": "2TDB agent",
@@ -1288,20 +1288,20 @@
    "kind": "corrected",
    "answer": "10",
    "correct": true,
-   "seconds": 2.397126630999992,
-   "input_tokens": 4159,
-   "output_tokens": 226
+   "seconds": 2.456663663004292,
+   "input_tokens": 4176,
+   "output_tokens": 222
   },
   {
    "system": "2TDB agent",
    "repeat": 3,
    "question": "q-19",
    "kind": "corrected",
-   "answer": "+91 98450 12345",
+   "answer": "+91 05550 12345",
    "correct": true,
-   "seconds": 2.3708966840000585,
-   "input_tokens": 4132,
-   "output_tokens": 221
+   "seconds": 2.8936029660035274,
+   "input_tokens": 4161,
+   "output_tokens": 327
   },
   {
    "system": "2TDB agent",
@@ -1310,31 +1310,31 @@
    "kind": "corrected",
    "answer": "12",
    "correct": true,
-   "seconds": 3.280675874999929,
-   "input_tokens": 4273,
-   "output_tokens": 429
+   "seconds": 5.108790823003801,
+   "input_tokens": 4287,
+   "output_tokens": 307
   },
   {
    "system": "2TDB agent",
    "repeat": 3,
    "question": "q-21",
    "kind": "corrected",
-   "answer": "Asha Rao",
+   "answer": "Halliard & Pike",
    "correct": true,
-   "seconds": 2.146319149000078,
-   "input_tokens": 4136,
-   "output_tokens": 227
+   "seconds": 2.3288882869965164,
+   "input_tokens": 4167,
+   "output_tokens": 245
   },
   {
    "system": "2TDB agent",
    "repeat": 3,
    "question": "q-22",
    "kind": "corrected",
-   "answer": "asha.rao@example.com",
+   "answer": "opps@halyardpike.example",
    "correct": true,
-   "seconds": 2.752435289999994,
-   "input_tokens": 4143,
-   "output_tokens": 228
+   "seconds": 2.852578951002215,
+   "input_tokens": 4160,
+   "output_tokens": 303
   },
   {
    "system": "2TDB agent",
@@ -1343,9 +1343,9 @@
    "kind": "corrected",
    "answer": "operations manager",
    "correct": true,
-   "seconds": 3.1057562759999655,
-   "input_tokens": 6620,
-   "output_tokens": 291
+   "seconds": 2.555757091002306,
+   "input_tokens": 4149,
+   "output_tokens": 245
   },
   {
    "system": "2TDB agent",
@@ -1354,9 +1354,9 @@
    "kind": "corrected",
    "answer": "card",
    "correct": true,
-   "seconds": 2.5436052580000705,
-   "input_tokens": 4137,
-   "output_tokens": 255
+   "seconds": 2.2775145350024104,
+   "input_tokens": 4153,
+   "output_tokens": 223
   },
   {
    "system": "RAG baseline",
@@ -1365,9 +1365,9 @@
    "kind": "current",
    "answer": "Bengaluru",
    "correct": true,
-   "seconds": 0.6168262239999649,
-   "input_tokens": 380,
-   "output_tokens": 8
+   "seconds": 0.9267522989975987,
+   "input_tokens": 370,
+   "output_tokens": 81
   },
   {
    "system": "RAG baseline",
@@ -1376,9 +1376,9 @@
    "kind": "current",
    "answer": "Enterprise",
    "correct": true,
-   "seconds": 1.0253591160000042,
-   "input_tokens": 367,
-   "output_tokens": 86
+   "seconds": 1.1105020680042799,
+   "input_tokens": 365,
+   "output_tokens": 111
   },
   {
    "system": "RAG baseline",
@@ -1387,9 +1387,9 @@
    "kind": "current",
    "answer": "11",
    "correct": true,
-   "seconds": 1.79754514199999,
-   "input_tokens": 364,
-   "output_tokens": 78
+   "seconds": 1.0710157040011836,
+   "input_tokens": 352,
+   "output_tokens": 106
   },
   {
    "system": "RAG baseline",
@@ -1398,9 +1398,9 @@
    "kind": "current",
    "answer": "annual",
    "correct": true,
-   "seconds": 0.8183037090000198,
+   "seconds": 1.2360058310005115,
    "input_tokens": 359,
-   "output_tokens": 73
+   "output_tokens": 110
   },
   {
    "system": "RAG baseline",
@@ -1409,7 +1409,7 @@
    "kind": "current",
    "answer": "15",
    "correct": true,
-   "seconds": 0.8309500100000378,
+   "seconds": 0.649056661000941,
    "input_tokens": 352,
    "output_tokens": 3
   },
@@ -1420,9 +1420,9 @@
    "kind": "current",
    "answer": "2027-04-01",
    "correct": true,
-   "seconds": 1.7071108300000333,
+   "seconds": 1.76166517999809,
    "input_tokens": 373,
-   "output_tokens": 232
+   "output_tokens": 260
   },
   {
    "system": "RAG baseline",
@@ -1431,9 +1431,9 @@
    "kind": "current",
    "answer": "WhatsApp",
    "correct": true,
-   "seconds": 1.069500005000009,
-   "input_tokens": 343,
-   "output_tokens": 95
+   "seconds": 0.8759012759983307,
+   "input_tokens": 345,
+   "output_tokens": 71
   },
   {
    "system": "RAG baseline",
@@ -1442,7 +1442,7 @@
    "kind": "current",
    "answer": "UPI",
    "correct": true,
-   "seconds": 0.5990428820000488,
+   "seconds": 0.5952697960019577,
    "input_tokens": 350,
    "output_tokens": 5
   },
@@ -1453,20 +1453,20 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.1900363409999954,
-   "input_tokens": 371,
-   "output_tokens": 126
+   "seconds": 1.0583150349993957,
+   "input_tokens": 361,
+   "output_tokens": 86
   },
   {
    "system": "RAG baseline",
    "repeat": 3,
    "question": "q-10",
    "kind": "past",
-   "answer": "Pune",
-   "correct": true,
-   "seconds": 1.1945484960000385,
+   "answer": "unknown",
+   "correct": false,
+   "seconds": 1.6875926599968807,
    "input_tokens": 361,
-   "output_tokens": 143
+   "output_tokens": 73
   },
   {
    "system": "RAG baseline",
@@ -1475,9 +1475,9 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 0.7948949189999439,
+   "seconds": 0.8555732669992722,
    "input_tokens": 377,
-   "output_tokens": 54
+   "output_tokens": 53
   },
   {
    "system": "RAG baseline",
@@ -1486,9 +1486,9 @@
    "kind": "past",
    "answer": "Pro",
    "correct": true,
-   "seconds": 0.9337299130000929,
-   "input_tokens": 377,
-   "output_tokens": 68
+   "seconds": 0.9757522169966251,
+   "input_tokens": 385,
+   "output_tokens": 92
   },
   {
    "system": "RAG baseline",
@@ -1497,9 +1497,9 @@
    "kind": "past",
    "answer": "5",
    "correct": true,
-   "seconds": 1.1445187069999747,
-   "input_tokens": 346,
-   "output_tokens": 135
+   "seconds": 1.2231096909963526,
+   "input_tokens": 360,
+   "output_tokens": 166
   },
   {
    "system": "RAG baseline",
@@ -1508,9 +1508,9 @@
    "kind": "past",
    "answer": "monthly",
    "correct": true,
-   "seconds": 0.7647994540000127,
+   "seconds": 0.878849088003335,
    "input_tokens": 378,
-   "output_tokens": 60
+   "output_tokens": 61
   },
   {
    "system": "RAG baseline",
@@ -1519,20 +1519,20 @@
    "kind": "past",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.150720731999968,
+   "seconds": 0.6462303799999063,
    "input_tokens": 369,
-   "output_tokens": 61
+   "output_tokens": 5
   },
   {
    "system": "RAG baseline",
    "repeat": 3,
    "question": "q-16",
    "kind": "past",
-   "answer": "No",
+   "answer": "no",
    "correct": true,
-   "seconds": 0.7428780849999157,
-   "input_tokens": 362,
-   "output_tokens": 46
+   "seconds": 1.3957820130017353,
+   "input_tokens": 376,
+   "output_tokens": 172
   },
   {
    "system": "RAG baseline",
@@ -1541,9 +1541,9 @@
    "kind": "corrected",
    "answer": "2027-03-01",
    "correct": true,
-   "seconds": 0.8717939719999777,
+   "seconds": 1.0024624610014143,
    "input_tokens": 379,
-   "output_tokens": 70
+   "output_tokens": 95
   },
   {
    "system": "RAG baseline",
@@ -1552,20 +1552,20 @@
    "kind": "corrected",
    "answer": "10",
    "correct": true,
-   "seconds": 0.8657397320000655,
-   "input_tokens": 365,
-   "output_tokens": 72
+   "seconds": 1.115123969000706,
+   "input_tokens": 369,
+   "output_tokens": 74
   },
   {
    "system": "RAG baseline",
    "repeat": 3,
    "question": "q-19",
    "kind": "corrected",
-   "answer": "+91 98450 12345",
+   "answer": "+91 05550 12345",
    "correct": true,
-   "seconds": 1.137153099000102,
-   "input_tokens": 376,
-   "output_tokens": 113
+   "seconds": 0.9507286349980859,
+   "input_tokens": 373,
+   "output_tokens": 105
   },
   {
    "system": "RAG baseline",
@@ -1574,9 +1574,9 @@
    "kind": "corrected",
    "answer": "12",
    "correct": true,
-   "seconds": 1.1102904099999478,
-   "input_tokens": 386,
-   "output_tokens": 82
+   "seconds": 0.8604873590011266,
+   "input_tokens": 374,
+   "output_tokens": 62
   },
   {
    "system": "RAG baseline",
@@ -1585,31 +1585,31 @@
    "kind": "corrected",
    "answer": "unknown",
    "correct": false,
-   "seconds": 1.0175275640000336,
-   "input_tokens": 376,
-   "output_tokens": 128
+   "seconds": 2.2166662919989903,
+   "input_tokens": 381,
+   "output_tokens": 348
   },
   {
    "system": "RAG baseline",
    "repeat": 3,
    "question": "q-22",
    "kind": "corrected",
-   "answer": "unknown",
-   "correct": false,
-   "seconds": 0.9075920249999854,
-   "input_tokens": 367,
-   "output_tokens": 84
+   "answer": "opps@halyardpike.example",
+   "correct": true,
+   "seconds": 1.252968934000819,
+   "input_tokens": 381,
+   "output_tokens": 147
   },
   {
    "system": "RAG baseline",
    "repeat": 3,
    "question": "q-23",
    "kind": "corrected",
-   "answer": "Operations manager",
+   "answer": "operations manager",
    "correct": true,
-   "seconds": 1.071640804000026,
-   "input_tokens": 360,
-   "output_tokens": 98
+   "seconds": 1.0196532779955305,
+   "input_tokens": 373,
+   "output_tokens": 92
   },
   {
    "system": "RAG baseline",
@@ -1618,10 +1618,10 @@
    "kind": "corrected",
    "answer": "Card",
    "correct": true,
-   "seconds": 0.8629567599999746,
+   "seconds": 0.8398511019986472,
    "input_tokens": 349,
-   "output_tokens": 86
+   "output_tokens": 79
   }
  ],
- "table": "| System | current | past | corrected | All | Median s per question | $ per question | $ to ingest |\n|---|---|---|---|---|---|---|---|\n| 2TDB agent | 24/24 | 24/24 | 24/24 | 72/72 | 2.0 | 0.00048 | 0.0158 |\n| RAG baseline | 24/24 | 15/24 | 18/24 | 57/72 | 1.0 | 0.00008 | 0.0000 |\n\nCounts are correct answers over 3 repeats; costs are per repeat at $0.1/$0.5 per million input/output tokens."
+ "table": "| System | current | past | corrected | All | Median s per question | $ per question | $ to ingest |\n|---|---|---|---|---|---|---|---|\n| 2TDB agent | 24/24 | 24/24 | 24/24 | 72/72 | 1.7 | 0.00048 | 0.0158 |\n| RAG baseline | 24/24 | 12/24 | 21/24 | 57/72 | 1.0 | 0.00009 | 0.0000 |\n\nCounts are correct answers over 3 repeats; ingest costs are per repeat; prices are $0.1/$0.5 per million input/output tokens."
 }

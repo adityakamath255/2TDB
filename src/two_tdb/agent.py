@@ -40,12 +40,12 @@ TOOL_CALLS_PER_MESSAGE = 8
 # the facts the agent may record, with their types; free-text facts go
 # under note/<topic>
 ATTRIBUTES: dict[str, tuple[type, str]] = {
-    "name": (str, "full name"),
+    "name": (str, "contact person's full name"),
     "email": (str, "email address"),
     "phone": (str, "phone number"),
-    "city": (str, "city the customer lives in"),
+    "city": (str, "city the customer is based in"),
     "address": (str, "street address"),
-    "company": (str, "employer"),
+    "company": (str, "company name"),
     "role": (str, "job title"),
     "plan": (str, "subscription plan: free, pro or enterprise"),
     "seats": (int, "number of paid seats"),
@@ -55,7 +55,7 @@ ATTRIBUTES: dict[str, tuple[type, str]] = {
     "discount_percent": (float, "agreed discount in percent"),
     "contract_signed": (bool, "whether the customer has signed the contract"),
     "contact_channel": (str, "preferred way to reach the customer"),
-    "language": (str, "preferred language"),
+    "invoice_delivery": (str, "how invoices are sent, such as post or email"),
 }
 
 _ATTRIBUTE_LINES = "\n".join(
