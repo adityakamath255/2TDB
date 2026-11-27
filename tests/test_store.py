@@ -322,6 +322,26 @@ def test_commit_takes_any_iterable_and_rejects_empty_input(store):
     )
 
 
+def test_commit_rolls_back_all_writes_when_one_fails(
+    new_tenant, connect_app, open_store
+):
+    tenant = new_tenant()
+    # a vector of the wrong size fails the insert into changes, which runs
+    # after the event's row is inserted
+    broken = Store(
+        connect_app(),
+        tenant,
+        lambda texts: [[0.1] * (3 if t[0] == "z" else 384) for t in texts],
+    )
+    with pytest.raises(psycopg.errors.DataException):
+        commit(broken, Write.set("a", 1), Write.set("z", 1))
+
+    store = open_store(tenant)
+    assert store.is_empty()
+    assert store.latest().state() == {}
+    assert commit(store, Write.set("a", 2)) == 1
+
+
 @pytest.mark.parametrize(
     "make",
     [
