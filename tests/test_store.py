@@ -17,6 +17,7 @@ from two_tdb import (
     Store,
     Write,
 )
+from two_tdb.embedding import Embedder
 
 
 def ts(text: str) -> datetime:
@@ -493,8 +494,6 @@ def test_search_ranks_only_the_facts_held_at_the_snapshot(store):
 
 
 def test_the_embedding_model_fits_the_schema(new_tenant, connect_app):
-    from two_tdb.embedding import Embedder
-
     store = Store(connect_app(), new_tenant(), Embedder())
     commit(
         store,
