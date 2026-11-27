@@ -96,6 +96,8 @@ uv run pytest
 
 The tests drop and recreate a database named `two_tdb_test` on that server, and run the agent against a scripted model, so they need no API key.
 
+CI runs the same tests on pushes to `main` and on pull requests, after `uv run ruff format --check .`, `uv run ruff check .` and `uv run pyright`.
+
 ## Limitations
 
 - Search ranks every key's current fact without an index, so its cost grows with the number of keys in a tenant, like `state` (about 20 ms at 1,000 keys).
