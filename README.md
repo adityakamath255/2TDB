@@ -4,6 +4,19 @@
 
 The earlier Rust library, an embedded store on SQLite, is on the [`rust`](https://github.com/adityakamath255/2TDB/tree/rust) branch (tag `rust-0.1.0`). Its predecessor in Python is [TTDB](https://github.com/adityakamath255/TTDB).
 
+## Demo
+
+A read-only copy runs at https://2tdb.duckdns.org. It holds the evaluation's customer: the agent read the 26 scenario messages and recorded 24 events, including corrected details and a back-dated move. Open https://2tdb.duckdns.org/docs, choose Authorize and paste the key below, or use curl:
+
+```sh
+KEY=2tdb_6a596f0e533c047d5e5828f6de4c398934073dd02a8c2f84ee7851a603b21f10
+curl -H "Authorization: Bearer $KEY" https://2tdb.duckdns.org/state
+curl -H "Authorization: Bearer $KEY" "https://2tdb.duckdns.org/history?key=email"
+curl -H "Authorization: Bearer $KEY" "https://2tdb.duckdns.org/value?key=city&valid_at=2026-03-01T00:00:00Z"
+```
+
+The key reads only the demo tenant and can't commit. Valid times follow the messages' dates; commit times are when the seed ran, on 27 November 2026.
+
 ## Usage
 
 Start Postgres and the API, then create a tenant and a key:
@@ -87,6 +100,27 @@ docker compose up -d --wait db
 ANTHROPIC_API_KEY=... uv run python -m evaluation.run
 ```
 
+## Deployment
+
+The demo runs on Google Cloud's free-tier e2-micro VM (2 shared vCPUs, 1 GB of memory, a 30 GB standard disk) in us-central1, with Debian 13, Docker from Docker's own repository and a 2 GB swap file. It runs the same `compose.yaml` with the `public` profile, which adds Caddy to serve HTTPS and renew the certificate. A `.env` file next to `compose.yaml` sets:
+
+```sh
+COMPOSE_PROFILES=public
+DOMAIN=2tdb.duckdns.org
+POSTGRES_PASSWORD=...
+TWO_TDB_APP_PASSWORD=...
+```
+
+Then `docker compose up -d --build` starts it, and `git pull` with the same command updates it. The firewall opens ports 80 and 443; Postgres listens only on the VM itself. Building the image on the VM took over 10 minutes and peaked at 642 MB of memory; running, the three containers leave about 290 MB free, with 150 MB in swap.
+
+The demo tenant was seeded from a laptop through an SSH tunnel to the VM's Postgres, so the Anthropic key never reached the VM:
+
+```sh
+gcloud compute ssh twotdb -- -N -L 15432:127.0.0.1:5432 &
+TWO_TDB_DATABASE_URL=postgresql://two_tdb_app:...@127.0.0.1:15432/two_tdb \
+    ANTHROPIC_API_KEY=... uv run python -m evaluation.seed 1
+```
+
 ## Tests
 
 ```sh
@@ -105,3 +139,4 @@ CI runs the same tests on pushes to `main` and on pull requests, after `uv run r
 - One tenant's commits run one at a time, so a stuck writer holds up that tenant until it times out.
 - The evaluation is one scripted customer and 24 questions. Its baseline retrieves five messages; with this few messages, putting all of them in the prompt would be a stronger baseline.
 - The agent's facts come from a fixed attribute list; anything else goes into free-text notes.
+- The demo is one small VM with no backups and no rate limit, so anyone with the public key can read the demo tenant as often as they like.
