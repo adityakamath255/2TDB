@@ -1,7 +1,9 @@
-"""The baseline: plain retrieval-augmented generation over the customer's raw messages.
+"""The baseline: plain retrieval-augmented generation over the customer's
+raw messages.
 
-It keeps every customer message with its sent time, and answers a question from
-the messages closest in meaning to it, with the same model and embedder as the agent.
+It keeps every customer message with its sent time, and answers a question
+from the messages closest in meaning to it, with the same model and embedder
+as the agent.
 """
 
 import math
@@ -23,7 +25,9 @@ when the messages don't contain the answer.
 
 
 def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
-    return sum(x * y for x, y in zip(a, b, strict=True)) / (math.hypot(*a) * math.hypot(*b))
+    return sum(x * y for x, y in zip(a, b, strict=True)) / (
+        math.hypot(*a) * math.hypot(*b)
+    )
 
 
 class Notes:
@@ -38,22 +42,45 @@ class Notes:
         self._messages.append((message, vector))
 
     def search(self, text: str, limit: int = RETRIEVED) -> list[Message]:
-        """Returns the limit messages closest in meaning to text, oldest first."""
+        """Returns the limit messages closest in meaning to text, oldest
+        first.
+        """
         (query,) = self._embed([text])
-        ranked = sorted(self._messages, key=lambda entry: -_cosine(query, entry[1]))
-        return sorted((message for message, _ in ranked[:limit]), key=lambda message: message.sent_at)
+        ranked = sorted(
+            self._messages, key=lambda entry: -_cosine(query, entry[1])
+        )
+        return sorted(
+            (message for message, _ in ranked[:limit]),
+            key=lambda message: message.sent_at,
+        )
 
 
-def answer(client: anthropic.Anthropic, notes: Notes, question: Message) -> Reply:
-    found = "\n".join(f"[{m.sent_at.isoformat()}] {m.text}" for m in notes.search(question.text))
+def answer(
+    client: anthropic.Anthropic, notes: Notes, question: Message
+) -> Reply:
+    found = "\n".join(
+        f"[{m.sent_at.isoformat()}] {m.text}"
+        for m in notes.search(question.text)
+    )
     response = client.messages.create(
         model=MODEL,
         max_tokens=4096,
         system=SYSTEM_PROMPT,
-        messages=[{
-            "role": "user",
-            "content": f"Customer messages:\n{found}\n\nQuestion, asked {question.sent_at.isoformat()}: {question.text}",
-        }],
+        messages=[
+            {
+                "role": "user",
+                "content": f"Customer messages:\n{found}\n\n"
+                f"Question, asked {question.sent_at.isoformat()}: "
+                f"{question.text}",
+            }
+        ],
     )
-    text = "".join(block.text for block in response.content if block.type == "text")
-    return Reply(text, response.usage.input_tokens, response.usage.output_tokens, tool_calls=0)
+    text = "".join(
+        block.text for block in response.content if block.type == "text"
+    )
+    return Reply(
+        text,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        tool_calls=0,
+    )

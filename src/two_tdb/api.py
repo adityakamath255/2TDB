@@ -49,7 +49,11 @@ class At(BaseModel, extra="forbid"):
             snapshot = reader.known_at(self.known_at)
         else:
             snapshot = reader.latest()
-        return snapshot if self.valid_at is None else snapshot.valid_at(self.valid_at)
+        return (
+            snapshot
+            if self.valid_at is None
+            else snapshot.valid_at(self.valid_at)
+        )
 
 
 class KeyAt(At):
@@ -80,8 +84,16 @@ class DiffQuery(BaseModel, extra="forbid"):
 
     def sides(self) -> tuple[At, At]:
         return (
-            At(event=self.from_event, known_at=self.from_known_at, valid_at=self.from_valid_at),
-            At(event=self.to_event, known_at=self.to_known_at, valid_at=self.to_valid_at),
+            At(
+                event=self.from_event,
+                known_at=self.from_known_at,
+                valid_at=self.from_valid_at,
+            ),
+            At(
+                event=self.to_event,
+                known_at=self.to_known_at,
+                valid_at=self.to_valid_at,
+            ),
         )
 
 
@@ -176,15 +188,21 @@ class Committed:
 _bearer = HTTPBearer(description="An API key from create_api_key.")
 
 
-def _reader(request: Request, credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)]) -> Iterator[Reader]:
+def _reader(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)],
+) -> Iterator[Reader]:
     pool: ConnectionPool = request.app.state.pool
     embed: Embed = request.app.state.embed
     with pool.connection() as connection:
         tenant, writable = connection.execute(
-            "SELECT tenant, writable FROM api_key_tenant(%s)", [credentials.credentials]
+            "SELECT tenant, writable FROM api_key_tenant(%s)",
+            [credentials.credentials],
         ).fetchone()
         if tenant is None:
-            raise HTTPException(401, "unknown API key", headers={"WWW-Authenticate": "Bearer"})
+            raise HTTPException(
+                401, "unknown API key", headers={"WWW-Authenticate": "Bearer"}
+            )
         yield (Store if writable else Reader)(connection, tenant, embed)
 
 
@@ -198,17 +216,25 @@ type ReaderDep = Annotated[Reader, Depends(_reader)]
 
 
 def create_app(conninfo: str, embed: Embed) -> FastAPI:
-    """Returns the HTTP API over the database at conninfo, which must log in as two_tdb_app."""
+    """Returns the HTTP API over the database at conninfo, which must log in
+    as two_tdb_app.
+    """
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        with ConnectionPool(conninfo, kwargs={"autocommit": True}, open=False) as pool:
+        with ConnectionPool(
+            conninfo, kwargs={"autocommit": True}, open=False
+        ) as pool:
             pool.open(wait=True)
             app.state.pool = pool
             app.state.embed = embed
             yield
 
-    app = FastAPI(title="2TDB", summary="A bitemporal key-value store.", lifespan=lifespan)
+    app = FastAPI(
+        title="2TDB",
+        summary="A bitemporal key-value store.",
+        lifespan=lifespan,
+    )
 
     @app.exception_handler(InvalidInput)
     @app.exception_handler(EmptyCommit)
@@ -221,12 +247,20 @@ def create_app(conninfo: str, embed: Embed) -> FastAPI:
 
     @app.exception_handler(PoolTimeout)
     def _busy(request: Request, error: PoolTimeout) -> JSONResponse:
-        return JSONResponse({"detail": "no database connection free; try again"}, status_code=503)
+        return JSONResponse(
+            {"detail": "no database connection free; try again"},
+            status_code=503,
+        )
 
     @app.post("/events", status_code=201)
-    def commit(body: CommitIn, store: Annotated[Store, Depends(_store)]) -> Committed:
+    def commit(
+        body: CommitIn, store: Annotated[Store, Depends(_store)]
+    ) -> Committed:
         """Records the writes as one event."""
-        writes = [Write(write.key, write.value, write.valid_from) for write in body.writes]
+        writes = [
+            Write(write.key, write.value, write.valid_from)
+            for write in body.writes
+        ]
         return Committed(store.commit(writes, source=body.source))
 
     @app.get("/events/{event_id}")
@@ -236,13 +270,19 @@ def create_app(conninfo: str, embed: Embed) -> FastAPI:
     @app.get("/value")
     def value(query: Annotated[KeyAt, Query()], reader: ReaderDep) -> ValueOut:
         snapshot = query.snapshot(reader)
-        return ValueOut(SnapshotOut.of(snapshot), query.key, snapshot.get(query.key))
+        return ValueOut(
+            SnapshotOut.of(snapshot), query.key, snapshot.get(query.key)
+        )
 
     @app.get("/blame")
     def blame(query: Annotated[KeyAt, Query()], reader: ReaderDep) -> BlameOut:
-        """Returns the assertion that decides the key's value, including a deletion."""
+        """Returns the assertion that decides the key's value, including a
+        deletion.
+        """
         snapshot = query.snapshot(reader)
-        return BlameOut(SnapshotOut.of(snapshot), query.key, snapshot.blame(query.key))
+        return BlameOut(
+            SnapshotOut.of(snapshot), query.key, snapshot.blame(query.key)
+        )
 
     @app.get("/state")
     def state(query: Annotated[At, Query()], reader: ReaderDep) -> StateOut:
@@ -250,25 +290,43 @@ def create_app(conninfo: str, embed: Embed) -> FastAPI:
         return StateOut(SnapshotOut.of(snapshot), snapshot.state())
 
     @app.get("/search")
-    def search(query: Annotated[SearchAt, Query()], reader: ReaderDep) -> SearchOut:
-        """Returns the facts held at the snapshot that are closest in meaning to q, closest first."""
+    def search(
+        query: Annotated[SearchAt, Query()], reader: ReaderDep
+    ) -> SearchOut:
+        """Returns the facts held at the snapshot that are closest in meaning
+        to q, closest first.
+        """
         snapshot = query.snapshot(reader)
-        matches = [Fact(key, value) for key, value in snapshot.search(query.q, query.limit).items()]
+        matches = [
+            Fact(key, value)
+            for key, value in snapshot.search(query.q, query.limit).items()
+        ]
         return SearchOut(SnapshotOut.of(snapshot), matches)
 
     @app.get("/changepoints")
-    def changepoints(query: Annotated[At, Query()], reader: ReaderDep) -> ChangepointsOut:
+    def changepoints(
+        query: Annotated[At, Query()], reader: ReaderDep
+    ) -> ChangepointsOut:
         snapshot = query.snapshot(reader)
-        return ChangepointsOut(SnapshotOut.of(snapshot), snapshot.changepoints())
+        return ChangepointsOut(
+            SnapshotOut.of(snapshot), snapshot.changepoints()
+        )
 
     @app.get("/diff")
-    def diff(query: Annotated[DiffQuery, Query()], reader: ReaderDep) -> DiffOut:
+    def diff(
+        query: Annotated[DiffQuery, Query()], reader: ReaderDep
+    ) -> DiffOut:
         before, after = (side.snapshot(reader) for side in query.sides())
-        changes = {key: DeltaOut.of(delta) for key, delta in before.diff(after).items()}
+        changes = {
+            key: DeltaOut.of(delta)
+            for key, delta in before.diff(after).items()
+        }
         return DiffOut(SnapshotOut.of(before), SnapshotOut.of(after), changes)
 
     @app.get("/history")
-    def history(query: Annotated[KeyQuery, Query()], reader: ReaderDep) -> list[RecordedAssertion]:
+    def history(
+        query: Annotated[KeyQuery, Query()], reader: ReaderDep
+    ) -> list[RecordedAssertion]:
         return reader.history(query.key)
 
     @app.get("/keys")

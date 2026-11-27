@@ -29,15 +29,21 @@ class OutOfRange(StoreError):
 
 
 def aware(time: datetime) -> datetime:
-    """Returns time unchanged; raises InvalidInput unless it has a UTC offset."""
+    """Returns time unchanged; raises InvalidInput unless it has a UTC
+    offset.
+    """
     if not isinstance(time, datetime) or time.utcoffset() is None:
-        raise InvalidInput(f"expected a datetime with a UTC offset, got {time!r}")
+        raise InvalidInput(
+            f"expected a datetime with a UTC offset, got {time!r}"
+        )
     return time
 
 
 def _check_text(what: str, text: object) -> None:
     if not isinstance(text, str) or text == "" or "\x00" in text:
-        raise InvalidInput(f"{what} must be a non-empty string without NUL, got {text!r}")
+        raise InvalidInput(
+            f"{what} must be a non-empty string without NUL, got {text!r}"
+        )
 
 
 def _check_value(value: object) -> None:
@@ -53,7 +59,9 @@ def _check_value(value: object) -> None:
         case int() | float() | str():
             pass
         case _:
-            raise InvalidInput(f"unsupported value type {type(value).__name__}")
+            raise InvalidInput(
+                f"unsupported value type {type(value).__name__}"
+            )
 
 
 def check_source(source: object) -> None:
@@ -63,7 +71,8 @@ def check_source(source: object) -> None:
 
 @dataclass(frozen=True)
 class Write:
-    """One assertion to commit: a value for key from valid_from on, or None to delete.
+    """One assertion to commit: a value for key from valid_from on, or None
+    to delete.
 
     A write without valid_from takes effect at its event's commit time.
     """
@@ -80,7 +89,9 @@ class Write:
             aware(self.valid_from)
 
     @classmethod
-    def set(cls, key: str, value: Value, valid_from: datetime | None = None) -> "Write":
+    def set(
+        cls, key: str, value: Value, valid_from: datetime | None = None
+    ) -> "Write":
         if value is None:
             raise InvalidInput("use Write.delete to delete a key")
         return cls(key, value, valid_from)

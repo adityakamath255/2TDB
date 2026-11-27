@@ -30,3 +30,11 @@ dev = [
 testpaths = ["tests"]
 pythonpath = ["."]
 filterwarnings = ["ignore:.asyncio.iscoroutinefunction. is deprecated:DeprecationWarning:langsmith"]
+
+[tool.ruff]
+line-length = 79
+
+[tool.ruff.lint]
+# ruff's default rule set leaves out E501, and the formatter can't split
+# strings or comments
+extend-select = ["E501"]

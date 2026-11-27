@@ -45,7 +45,13 @@ def test_transaction_time_travel_reflects_each_commit(store):
 
 
 def test_values_round_trip_with_their_types(store):
-    commit(store, Write.set("b", True), Write.set("i", 1), Write.set("f", 2.5), Write.set("s", "hi"))
+    commit(
+        store,
+        Write.set("b", True),
+        Write.set("i", 1),
+        Write.set("f", 2.5),
+        Write.set("s", "hi"),
+    )
 
     state = store.latest().state()
     assert state == {"b": True, "i": 1, "f": 2.5, "s": "hi"}
@@ -122,8 +128,18 @@ def test_keys_sort_as_python_sorts_strings(store):
 
 
 def test_diff_spans_both_axes(store, new_store):
-    commit(store, Write.set("keep", 1), Write.set("change", 2), Write.set("drop", 3))
-    commit(store, Write.set("change", 20), Write.delete("drop"), Write.set("add", 4))
+    commit(
+        store,
+        Write.set("keep", 1),
+        Write.set("change", 2),
+        Write.set("drop", 3),
+    )
+    commit(
+        store,
+        Write.set("change", 20),
+        Write.delete("drop"),
+        Write.set("add", 4),
+    )
 
     assert store.at(1).diff(store.latest()) == {
         "add": Added(4),
@@ -141,7 +157,9 @@ def test_diff_spans_both_axes(store, new_store):
 def test_diff_compares_stores_and_tells_types_apart(new_store):
     a, b = new_store(), new_store()
     commit(a, Write.set("same", 1), Write.set("old", 2), Write.set("flag", 1))
-    commit(b, Write.set("same", 1), Write.set("new", 3), Write.set("flag", True))
+    commit(
+        b, Write.set("same", 1), Write.set("new", 3), Write.set("flag", True)
+    )
 
     assert a.latest().diff(b.latest()) == {
         "flag": Changed(1, True),
@@ -153,7 +171,11 @@ def test_diff_compares_stores_and_tells_types_apart(new_store):
 def test_changepoints_enumerate_the_valid_axis(store):
     assert store.latest().changepoints() == []
 
-    jan, mar, jun = ts("2020-01-01T00:00:00Z"), ts("2020-03-01T00:00:00Z"), ts("2020-06-01T00:00:00Z")
+    jan, mar, jun = (
+        ts("2020-01-01T00:00:00Z"),
+        ts("2020-03-01T00:00:00Z"),
+        ts("2020-06-01T00:00:00Z"),
+    )
     commit(store, Write.set("x", "a", jan))
     commit(store, Write.set("x", "b", jun))
     commit(store, Write.set("y", True, mar), Write.set("z", 1, jun))
@@ -184,10 +206,15 @@ def test_blame_names_the_assertion_in_force_and_its_source(store):
     store.commit([Write.delete("x")], source="message 3")
 
     now = store.latest()
-    assert now.valid_at(ts("2020-02-01T00:00:00Z")).blame("x") == RecordedAssertion(
+    assert now.valid_at(ts("2020-02-01T00:00:00Z")).blame(
+        "x"
+    ) == RecordedAssertion(
         1, store.event(1).committed_at, "message 1", Assertion("x", jan, "a")
     )
-    assert now.valid_at(ts("2020-04-01T00:00:00Z")).blame("x").source == "message 2"
+    assert (
+        now.valid_at(ts("2020-04-01T00:00:00Z")).blame("x").source
+        == "message 2"
+    )
 
     # absent now, and blame names the deleting event
     assert now.get("x") is None
@@ -220,7 +247,8 @@ def test_held_snapshots_stay_fixed_across_connections(store, open_reader):
     held = reader.latest()
     assert held.get("x") == 1
 
-    # same valid time, so the correction would win at the held snapshot if it could see it
+    # same valid time, so the correction would win at the held snapshot if
+    # it could see it
     second = commit(store, Write.set("x", 2, valid))
     fresh = reader.latest()
 
@@ -249,8 +277,12 @@ def test_history_reports_recorded_assertions(store):
     commit(store, Write.delete("x", valid))
 
     assert store.history("x") == [
-        RecordedAssertion(1, store.event(1).committed_at, "test", Assertion("x", valid, 1)),
-        RecordedAssertion(3, store.event(3).committed_at, "test", Assertion("x", valid, None)),
+        RecordedAssertion(
+            1, store.event(1).committed_at, "test", Assertion("x", valid, 1)
+        ),
+        RecordedAssertion(
+            3, store.event(3).committed_at, "test", Assertion("x", valid, None)
+        ),
     ]
 
 
@@ -276,13 +308,18 @@ def test_commit_takes_any_iterable_and_rejects_empty_input(store):
         store.commit([], source="test")
     assert store.is_empty()
 
-    event_id = store.commit((Write.set(key, True) for key in "ab"), source="test")
+    event_id = store.commit(
+        (Write.set(key, True) for key in "ab"), source="test"
+    )
 
     event = store.event(event_id)
     assert event_id == 1
     assert len(event.assertions) == 2
     # writes without a valid time take effect when committed
-    assert all(a.valid_from == event.committed_at and a.value is True for a in event.assertions)
+    assert all(
+        a.valid_from == event.committed_at and a.value is True
+        for a in event.assertions
+    )
 
 
 @pytest.mark.parametrize(
@@ -338,9 +375,12 @@ def test_a_tenant_cannot_write_into_another(new_store, connect_app):
     app = connect_app()
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         with app.transaction():
-            app.execute("SELECT set_config('app.tenant', %s, true)", [str(b.tenant)])
             app.execute(
-                "INSERT INTO events (tenant, seq, committed_at, source) VALUES (%s, 1, now(), 'x')",
+                "SELECT set_config('app.tenant', %s, true)", [str(b.tenant)]
+            )
+            app.execute(
+                "INSERT INTO events (tenant, seq, committed_at, source)"
+                " VALUES (%s, 1, now(), 'x')",
                 [a.tenant],
             )
 
@@ -348,10 +388,17 @@ def test_a_tenant_cannot_write_into_another(new_store, connect_app):
 def test_the_app_cannot_rewrite_history(store, connect_app):
     commit(store, Write.set("x", 1))
     app = connect_app()
-    for statement in ("UPDATE changes SET int_value = 2", "DELETE FROM changes", "DELETE FROM events"):
+    for statement in (
+        "UPDATE changes SET int_value = 2",
+        "DELETE FROM changes",
+        "DELETE FROM events",
+    ):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             with app.transaction():
-                app.execute("SELECT set_config('app.tenant', %s, true)", [str(store.tenant)])
+                app.execute(
+                    "SELECT set_config('app.tenant', %s, true)",
+                    [str(store.tenant)],
+                )
                 app.execute(statement)
     assert store.latest().get("x") == 1
 
@@ -377,7 +424,9 @@ def test_concurrent_commits_number_events_in_commit_order(store, open_store):
         except Exception as error:
             errors.append(error)
 
-    threads = [threading.Thread(target=write, args=[writer]) for writer in writers]
+    threads = [
+        threading.Thread(target=write, args=[writer]) for writer in writers
+    ]
     for thread in threads:
         thread.start()
     for thread in threads:
@@ -390,10 +439,12 @@ def test_concurrent_commits_number_events_in_commit_order(store, open_store):
 
 
 def test_commit_times_never_go_backwards(store, owner):
-    # an event stamped an hour ahead stands in for a clock that later steps back
+    # an event stamped an hour ahead stands in for a clock that later
+    # steps back
     ahead = owner.execute(
         "INSERT INTO events (tenant, seq, committed_at, source)"
-        " VALUES (%s, 1, now() + interval '1 hour', 'test') RETURNING committed_at",
+        " VALUES (%s, 1, now() + interval '1 hour', 'test')"
+        " RETURNING committed_at",
         [store.tenant],
     ).fetchone()[0]
 
@@ -404,14 +455,24 @@ def test_commit_times_never_go_backwards(store, owner):
 
 
 def test_search_ranks_only_the_facts_held_at_the_snapshot(store):
-    commit(store, Write.set("city", "Mumbai", ts("2026-01-01T00:00:00Z")), Write.set("pet", "a beagle"))
-    commit(store, Write.set("city", "Pune", ts("2026-10-01T00:00:00Z")), Write.set("plan", "pro"))
+    commit(
+        store,
+        Write.set("city", "Mumbai", ts("2026-01-01T00:00:00Z")),
+        Write.set("pet", "a beagle"),
+    )
+    commit(
+        store,
+        Write.set("city", "Pune", ts("2026-10-01T00:00:00Z")),
+        Write.set("plan", "pro"),
+    )
     commit(store, Write.delete("pet"))
 
     now = store.latest()
     assert list(now.search("city Mumbai")) == ["city", "plan"]
     assert now.search("city Mumbai", limit=1) == {"city": "Pune"}
-    assert now.valid_at(ts("2026-06-01T00:00:00Z")).search("city", limit=1) == {"city": "Mumbai"}
+    assert now.valid_at(ts("2026-06-01T00:00:00Z")).search(
+        "city", limit=1
+    ) == {"city": "Mumbai"}
     assert store.at(1).search("beagle", limit=1) == {"pet": "a beagle"}
     with pytest.raises(InvalidInput):
         now.search("city", limit=0)
@@ -421,9 +482,17 @@ def test_the_embedding_model_fits_the_schema(new_tenant, connect_app):
     from two_tdb.embedding import Embedder
 
     store = Store(connect_app(), new_tenant(), Embedder())
-    commit(store, Write.set("city", "Pune"), Write.set("pet", "a beagle named Bruno"), Write.delete("plan"))
+    commit(
+        store,
+        Write.set("city", "Pune"),
+        Write.set("pet", "a beagle named Bruno"),
+        Write.delete("plan"),
+    )
 
-    assert list(store.latest().search("where does she live")) == ["city", "pet"]
+    assert list(store.latest().search("where does she live")) == [
+        "city",
+        "pet",
+    ]
 
 
 def test_threads_can_share_a_store(store):

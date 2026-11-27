@@ -10,20 +10,30 @@ from datetime import datetime
 from typing import Literal
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import ToolCallLimitMiddleware, ToolErrorMiddleware
+from langchain.agents.middleware import (
+    ToolCallLimitMiddleware,
+    ToolErrorMiddleware,
+)
 from langchain.tools import ToolRuntime, tool
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel
 
-from two_tdb.model import InvalidInput, RecordedAssertion, StoreError, Value, Write
+from two_tdb.model import (
+    InvalidInput,
+    RecordedAssertion,
+    StoreError,
+    Value,
+    Write,
+)
 from two_tdb.store import Reader, Snapshot, Store
 
 MODEL = "claude-haiku-5-5"
 TOOL_CALLS_PER_MESSAGE = 8
 
-# the facts the agent may record, with their types; free-text facts go under note/<topic>
+# the facts the agent may record, with their types; free-text facts go
+# under note/<topic>
 ATTRIBUTES: dict[str, tuple[type, str]] = {
     "name": (str, "full name"),
     "email": (str, "email address"),
@@ -43,6 +53,11 @@ ATTRIBUTES: dict[str, tuple[type, str]] = {
     "language": (str, "preferred language"),
 }
 
+_ATTRIBUTE_LINES = "\n".join(
+    f"- {key}: {kind.__name__}, {meaning}"
+    for key, (kind, meaning) in ATTRIBUTES.items()
+)
+
 SYSTEM_PROMPT = f"""\
 You are the memory of a customer-support team for one customer. Each message is
 either from the customer or a question from support staff, and starts with a
@@ -57,7 +72,7 @@ latest valid_from at or before that time, and among facts with the same
 valid_from, the one recorded last.
 
 Facts you may record (key: type, meaning):
-{chr(10).join(f"- {key}: {kind.__name__}, {meaning}" for key, (kind, meaning) in ATTRIBUTES.items())}
+{_ATTRIBUTE_LINES}
 - note/<topic>: str, anything else worth keeping, one fact per topic
 
 On a customer message:
@@ -67,8 +82,8 @@ On a customer message:
 - A change ("we moved to Pune") is a new fact from the time it happened, so the
   old value stays true for the time before.
 - A correction ("my renewal is 1 April, not 1 March") fixes a mistake. Use
-  `blame` to find when the wrong fact took effect and record the right value with
-  that same valid_from, so it replaces the wrong one for the whole period.
+  `blame` to find when the wrong fact took effect and record the right value
+  with that same valid_from, so it replaces the wrong one for the whole period.
 - Reply to the customer in one or two sentences.
 
 On a staff question, use the tools to find the answer: `facts` or `lookup` with
@@ -80,7 +95,9 @@ for, and say "unknown" when the store doesn't have the answer.
 
 @dataclass(frozen=True)
 class Context:
-    """What one run of the agent works on: the customer's store and the message being handled."""
+    """What one run of the agent works on: the customer's store and the
+    message being handled.
+    """
 
     store: Store
     message_id: str
@@ -117,12 +134,16 @@ def _write(fact: Fact) -> Write:
     elif fact.key in ATTRIBUTES:
         kind = ATTRIBUTES[fact.key][0]
     else:
-        raise InvalidInput(f"{fact.key!r} is not a known attribute or note/<topic>")
+        raise InvalidInput(
+            f"{fact.key!r} is not a known attribute or note/<topic>"
+        )
     value = fact.value
     if kind is float and type(value) is int:
         value = float(value)
     if value is not None and type(value) is not kind:
-        raise InvalidInput(f"{fact.key} takes a {kind.__name__}, got {value!r}")
+        raise InvalidInput(
+            f"{fact.key} takes a {kind.__name__}, got {value!r}"
+        )
     return Write(fact.key, value, fact.valid_from)
 
 
@@ -130,48 +151,73 @@ def _write(fact: Fact) -> Write:
 def remember(facts: list[Fact], runtime: ToolRuntime[Context]) -> str:
     """Records facts about the customer, all in one event."""
     context = runtime.context
-    event = context.store.commit([_write(fact) for fact in facts], source=context.message_id)
+    event = context.store.commit(
+        [_write(fact) for fact in facts], source=context.message_id
+    )
     return f"recorded as event {event}"
 
 
 @tool
-def facts(runtime: ToolRuntime[Context], valid_at: datetime | None = None) -> str:
-    """Returns every fact true at valid_at (default: now), as the store holds them now."""
+def facts(
+    runtime: ToolRuntime[Context], valid_at: datetime | None = None
+) -> str:
+    """Returns every fact true at valid_at (default: now), as the store holds
+    them now.
+    """
     return _json(_snapshot(runtime.context.store, valid_at).state())
 
 
 @tool
-def lookup(key: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None) -> str:
-    """Returns the value of key at valid_at (default: now), or null if it has none."""
+def lookup(
+    key: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None
+) -> str:
+    """Returns the value of key at valid_at (default: now), or null if it
+    has none.
+    """
     return _json(_snapshot(runtime.context.store, valid_at).get(key))
 
 
 @tool
-def blame(key: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None) -> str:
-    """Returns the recorded fact that decides key's value at valid_at (default: now)."""
+def blame(
+    key: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None
+) -> str:
+    """Returns the recorded fact that decides key's value at valid_at
+    (default: now).
+    """
     entry = _snapshot(runtime.context.store, valid_at).blame(key)
     return _json(None if entry is None else _recorded(entry))
 
 
 @tool
 def history(key: str, runtime: ToolRuntime[Context]) -> str:
-    """Returns every fact ever recorded for key, in the order recorded, including superseded ones."""
-    return _json([_recorded(entry) for entry in runtime.context.store.history(key)])
+    """Returns every fact ever recorded for key, in the order recorded,
+    including superseded ones.
+    """
+    return _json(
+        [_recorded(entry) for entry in runtime.context.store.history(key)]
+    )
 
 
 @tool
-def search(query: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None) -> str:
-    """Returns the facts true at valid_at (default: now) closest in meaning to query."""
+def search(
+    query: str, runtime: ToolRuntime[Context], valid_at: datetime | None = None
+) -> str:
+    """Returns the facts true at valid_at (default: now) closest in meaning
+    to query.
+    """
     return _json(_snapshot(runtime.context.store, valid_at).search(query))
 
 
 def _store_error(error: Exception, request: object) -> str | None:
-    # store errors describe bad input, which the model can fix; anything else propagates
+    # store errors describe bad input, which the model can fix; anything
+    # else propagates
     return f"error: {error}" if isinstance(error, StoreError) else None
 
 
 def chat_model() -> ChatAnthropic:
-    """Claude Haiku through the Anthropic SDK, which reads ANTHROPIC_API_KEY."""
+    """Claude Haiku through the Anthropic SDK, which reads
+    ANTHROPIC_API_KEY.
+    """
     return ChatAnthropic(model=MODEL, max_tokens=4096)
 
 
@@ -184,7 +230,9 @@ def build(model: BaseChatModel):
         context_schema=Context,
         middleware=[
             ToolErrorMiddleware(on_error=_store_error),
-            ToolCallLimitMiddleware(run_limit=TOOL_CALLS_PER_MESSAGE, exit_behavior="end"),
+            ToolCallLimitMiddleware(
+                run_limit=TOOL_CALLS_PER_MESSAGE, exit_behavior="end"
+            ),
         ],
     )
 
@@ -206,8 +254,13 @@ class Reply:
 
 
 def respond(agent, store: Store, message: Message) -> Reply:
-    """Runs the agent on one message against store, committing with the message's ID as source."""
-    header = f"[{message.sender} message {message.id}, sent {message.sent_at.isoformat()}]"
+    """Runs the agent on one message against store, committing with the
+    message's ID as source.
+    """
+    header = (
+        f"[{message.sender} message {message.id}, "
+        f"sent {message.sent_at.isoformat()}]"
+    )
     result = agent.invoke(
         {"messages": [HumanMessage(f"{header}\n{message.text}")]},
         context=Context(store, message.id),
